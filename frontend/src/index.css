@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-cream text-ink font-sans antialiased;
+}
+
+::selection {
+  @apply bg-brand-200 text-brand-900;
+}
