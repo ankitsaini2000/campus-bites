@@ -98,9 +98,16 @@ function createApp() {
 
     if (distDir) {
       app.use(express.static(distDir));
-      // SPA fallback: any non-API GET renders the app shell.
+      // SPA fallback: page routes (no file extension) render the app
+      // shell. This app switches screens with state, not a router, so
+      // every real page is the root path. A request with an extension
+      // is an asset: a missing one (e.g. the old /vite.svg) stays a
+      // 404 rather than returning the HTML shell with a 200.
       app.use((req, res, next) => {
         if (req.method !== "GET" || req.path.startsWith("/api/")) {
+          return next();
+        }
+        if (path.extname(req.path)) {
           return next();
         }
         res.sendFile(path.join(distDir, "index.html"));
