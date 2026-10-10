@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Campus Bites favicon: brand-orange badge, cream plate with a bite -->
+  <rect width="64" height="64" rx="15" fill="#F97316"/>
+  <circle cx="31" cy="35" r="17" fill="#FFF7ED"/>
+  <circle cx="47" cy="21" r="8" fill="#F97316"/>
+</svg>
