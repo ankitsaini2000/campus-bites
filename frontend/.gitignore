@@ -28,3 +28,8 @@ test-results/
 playwright-report/
 e2e/screenshots/
 
+# Vercel CLI project linkage (local only)
+.vercel/
+
+.vercel
+.env*
