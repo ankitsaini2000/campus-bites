@@ -6,10 +6,14 @@ import axios from "axios";
  * The base URL was previously hardcoded as "http://localhost:5000" in six
  * places across four components. It is now configured through
  * VITE_API_URL (see .env.example), so deploying against another host does not
- * require editing source.
+ * require editing source. Production builds default to same-origin: the
+ * backend serves the built UI, so the browser calls the API on the host
+ * that served the page. Set VITE_API_URL when the UI and the API run on
+ * different origins.
  */
 const API_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000";
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.PROD ? "" : "http://localhost:5000");
 
 export const TOKEN_KEY = "token";
 

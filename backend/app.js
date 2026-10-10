@@ -1,5 +1,7 @@
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
+const fs = require("fs");
 const config = require("./config");
 const { apiLimiter } = require("./middleware/rateLimit");
 const { notFoundHandler, errorHandler } = require("./middleware/errorHandler");
@@ -31,6 +33,18 @@ function createApp() {
     res.setHeader("X-Frame-Options", "DENY");
     res.setHeader("Referrer-Policy", "no-referrer");
     res.setHeader("X-DNS-Prefetch-Control", "off");
+    // HSTS and a same-origin CSP close the two gaps the Antideploy
+    // security scan flagged (both LOW). The built bundle, fonts,
+    // images and the Socket.IO transport are all same-origin, so
+    // default-src 'self' is sufficient for this app.
+    res.setHeader(
+      "Strict-Transport-Security",
+      "max-age=31536000; includeSubDomains"
+    );
+    res.setHeader(
+      "Content-Security-Policy",
+      "default-src 'self'; base-uri 'self'; frame-ancestors 'none'"
+    );
     res.removeHeader("X-Powered-By");
     next();
   });
@@ -65,6 +79,38 @@ function createApp() {
   app.use("/api/users", userRoutes);
   app.use("/api/promos", promoRoutes);
   app.use("/api/announcements", announcementRoutes);
+
+  // --- Production: serve the built frontend ---
+  // In development the Vite dev server (port 5173) serves the UI and
+  // calls this API on localhost:5000. In production this Express app is
+  // the single origin for both UI and API: it serves the built bundle
+  // (frontend/dist in the monorepo, or public/ when only this package
+  // is shipped) and falls back to index.html so client-side routes
+  // resolve on a hard refresh.
+  if (config.isProduction) {
+    const distCandidates = [
+      path.join(__dirname, "..", "frontend", "dist"),
+      path.join(__dirname, "public"),
+    ];
+    const distDir = distCandidates.find((dir) =>
+      fs.existsSync(path.join(dir, "index.html"))
+    );
+
+    if (distDir) {
+      app.use(express.static(distDir));
+      // SPA fallback: any non-API GET renders the app shell.
+      app.use((req, res, next) => {
+        if (req.method !== "GET" || req.path.startsWith("/api/")) {
+          return next();
+        }
+        res.sendFile(path.join(distDir, "index.html"));
+      });
+    } else {
+      console.warn(
+        "[app] No built frontend found (frontend/dist or public/) - API only."
+      );
+    }
+  }
 
   // --- Centralized fallbacks (must be registered last) ---
   app.use(notFoundHandler);

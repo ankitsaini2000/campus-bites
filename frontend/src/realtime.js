@@ -39,7 +39,14 @@ export function createRealtimeClient({
     return { connect: () => {}, close: () => {}, subscribeToOrder: () => {}, isConnected: () => false };
   }
 
-  socket = io(import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_URL || "http://localhost:5000", {
+  // Same-origin by default in production (the backend serves the built
+  // UI). VITE_SOCKET_URL wins, then VITE_API_URL, then the dev default.
+  const socketUrl =
+    import.meta.env.VITE_SOCKET_URL ||
+    import.meta.env.VITE_API_URL ||
+    (import.meta.env.PROD ? undefined : "http://localhost:5000");
+
+  socket = io(socketUrl, {
     auth: { token },
     transports: ["websocket", "polling"],
     reconnection: true,
