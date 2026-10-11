@@ -106,17 +106,18 @@ export default function Signup({ switchPage, setUserRole, setUserName }) {
                 id="signup-email"
                 type="email"
                 autoComplete="email"
-                placeholder="2400520100…@ietlucknow.ac.in"
+                placeholder="2400520100107@ietlucknow.ac.in"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-ink placeholder:text-ink-mute/60 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none transition"
               />
               <p className="mt-1.5 text-xs text-ink-mute">
-                Use your IET Lucknow student ID — only{" "}
+                Use your IET Lucknow roll number — only{" "}
                 <span className="font-semibold text-ink-soft">
-                  2400520100…@ietlucknow.ac.in
+                  2400520100107@ietlucknow.ac.in
                 </span>{" "}
-                addresses can register.
+                style addresses can register (the last three
+                digits are yours).
               </p>
             </div>
 

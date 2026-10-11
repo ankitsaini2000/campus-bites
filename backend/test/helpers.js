@@ -50,10 +50,11 @@ async function registerAndLogin(overrides = {}) {
   const creds = {
     name: "Test Student",
     // The campus gate only admits IET Lucknow
-    // IDs, so tests register as campus students.
-    email: `2400520100${Math.floor(
-      Math.random() * 100000000
-    )}@ietlucknow.ac.in`,
+    // IDs (prefix + exactly three digits), so
+    // tests register as campus students.
+    email: `2400520100${String(
+      Math.floor(Math.random() * 1000)
+    ).padStart(3, "0")}@ietlucknow.ac.in`,
     password: "password123",
     ...overrides,
   };

@@ -111,10 +111,12 @@ const config = {
   // Sign-up policy. New registrations are limited to campus
   // student IDs; the value is a RegExp source string so
   // config stays serializable. The auth route compiles it.
+  // Roll numbers are the 2400520100 prefix plus exactly
+  // three digits, e.g. 2400520100107@ietlucknow.ac.in.
   auth: {
     campusEmailPattern:
       process.env.AUTH_EMAIL_PATTERN ||
-      "^2400520100\\d+@ietlucknow\\.ac\\.in$",
+      "^2400520100\\d{3}@ietlucknow\\.ac\\.in$",
   },
 };
 

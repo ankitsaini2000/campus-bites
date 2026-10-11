@@ -25,7 +25,7 @@ function assertCampusEmail(email) {
   if (!CAMPUS_EMAIL.test(email)) {
     throw ApiError.forbidden(
       "Registration is open to IET Lucknow student IDs only " +
-        "(2400520100…@ietlucknow.ac.in)"
+        "(roll numbers like 2400520100107@ietlucknow.ac.in)"
     );
   }
 }
