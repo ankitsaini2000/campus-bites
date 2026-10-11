@@ -7,10 +7,16 @@ import api from "../api";
  *
  * Stars are a plain 1–5 selector; the comment is
  * optional. The server verifies the completed order
- * before saving anything.
+ * before saving anything. `initialRating` presets
+ * the selector when opened from a star row.
  */
-export default function RatingModal({ food, onClose, onRated }) {
-  const [rating, setRating] = useState(5);
+export default function RatingModal({
+  food,
+  initialRating = 5,
+  onClose,
+  onRated,
+}) {
+  const [rating, setRating] = useState(initialRating);
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");

@@ -12,6 +12,7 @@ import {
   FaUsers,
   FaClock,
   FaStar,
+  FaCheck,
 } from "react-icons/fa";
 import api from "../api";
 import { statusTone, isActive } from "../orderStatus";
@@ -19,6 +20,7 @@ import OrderTimeline from "./OrderTimeline";
 import SeatsCard from "./SeatsCard";
 import SlotPicker from "./SlotPicker";
 import RatingModal from "./RatingModal";
+import ReceiptModal from "./ReceiptModal";
 import GroupPanel from "./GroupPanel";
 import { createRealtimeClient } from "../realtime";
 
@@ -186,6 +188,10 @@ export default function StudentDashboard({ name, onLogout }) {
   const [showSlotPicker, setShowSlotPicker] = useState(false);
   // Rating dialog target (a dish from a completed order).
   const [ratingTarget, setRatingTarget] = useState(null);
+  // Dishes rated during this session (for the ✓ marks).
+  const [ratedDishes, setRatedDishes] = useState(() => new Set());
+  // Receipt dialog target.
+  const [receiptTarget, setReceiptTarget] = useState(null);
   // Shared table order panel.
   const [groupPanelOpen, setGroupPanelOpen] = useState(false);
 
@@ -1101,25 +1107,7 @@ export default function StudentDashboard({ name, onLogout }) {
                   {(order.items || []).map((item, i) => (
                     <div key={`${item.food}-${i}`} className="flex justify-between text-ink-soft text-sm mb-1">
                       <span>{item.name} × {item.quantity}</span>
-                      <span className="flex items-center gap-2">
-                        ₹{item.price * item.quantity}
-                        {order.status === "Completed" && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setRatingTarget({
-                                _id: item.food,
-                                name: item.name,
-                              })
-                            }
-                            data-testid="rate-item"
-                            title={`Rate ${item.name}`}
-                            className="text-amber-500 hover:text-amber-600"
-                          >
-                            <FaStar />
-                          </button>
-                        )}
-                      </span>
+                      <span>₹{item.price * item.quantity}</span>
                     </div>
                   ))}
 
@@ -1136,6 +1124,59 @@ export default function StudentDashboard({ name, onLogout }) {
                     <span>Total:</span>
                     <span>₹{order.total}</span>
                   </div>
+
+                  {/* Completed: the meal is done — ask about it. */}
+                  {order.status === "Completed" && (
+                    <div
+                      className="mt-4 rounded-2xl bg-amber-50 border border-amber-200 p-4"
+                      data-testid="meal-rating"
+                    >
+                      <p className="font-extrabold text-ink mb-1">
+                        How was your meal?
+                      </p>
+                      <p className="text-xs text-ink-mute mb-3">
+                        Tap a star on any dish — you can add a
+                        comment too.
+                      </p>
+                      <div className="space-y-1.5">
+                        {order.items.map((item, i) => (
+                          <div
+                            key={`${item.food}-${i}`}
+                            className="flex items-center justify-between gap-3"
+                          >
+                            <span className="text-sm text-ink-soft truncate flex-1">
+                              {item.name}
+                              {ratedDishes.has(String(item.food)) && (
+                                <FaCheck className="inline ml-1.5 text-green-600" />
+                              )}
+                            </span>
+                            <div
+                              className="flex gap-0.5 shrink-0"
+                              data-testid={`dish-stars-${item.food}`}
+                            >
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <button
+                                  key={star}
+                                  type="button"
+                                  aria-label={`Rate ${item.name} ${star} star${star > 1 ? "s" : ""}`}
+                                  onClick={() =>
+                                    setRatingTarget({
+                                      _id: item.food,
+                                      name: item.name,
+                                      initialRating: star,
+                                    })
+                                  }
+                                  className="text-lg text-stone-300 hover:text-amber-400"
+                                >
+                                  <FaStar />
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Status history */}
                   {order.statusHistory?.length > 0 && (
@@ -1166,11 +1207,20 @@ export default function StudentDashboard({ name, onLogout }) {
                     <button
                       type="button"
                       onClick={() => reorder(order)}
-                      className="mt-4 bg-brand-100 hover:bg-brand-200 text-brand-800 font-semibold py-1.5 px-4 rounded-full"
+                      className="mt-4 mr-2 bg-brand-100 hover:bg-brand-200 text-brand-800 font-semibold py-1.5 px-4 rounded-full"
                     >
                       Reorder
                     </button>
                   )}
+
+                  <button
+                    type="button"
+                    onClick={() => setReceiptTarget(order)}
+                    data-testid="view-receipt"
+                    className="mt-4 bg-white border border-stone-200 hover:bg-stone-50 text-ink-soft font-semibold py-1.5 px-4 rounded-full text-sm"
+                  >
+                    Receipt
+                  </button>
                 </motion.div>
               ))}
             </div>
@@ -1195,9 +1245,22 @@ export default function StudentDashboard({ name, onLogout }) {
       {/* ===== Rating dialog ===== */}
       {ratingTarget && (
         <RatingModal
+          key={ratingTarget._id}
           food={ratingTarget}
+          initialRating={ratingTarget.initialRating}
           onClose={() => setRatingTarget(null)}
-          onRated={() => refreshOrders()}
+          onRated={(foodId) => {
+            setRatedDishes((prev) => new Set(prev).add(String(foodId)));
+            refreshOrders();
+          }}
+        />
+      )}
+
+      {/* ===== Receipt dialog ===== */}
+      {receiptTarget && (
+        <ReceiptModal
+          order={receiptTarget}
+          onClose={() => setReceiptTarget(null)}
         />
       )}
     </div>
