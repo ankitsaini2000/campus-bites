@@ -20,6 +20,7 @@ import {
   FaTags,
   FaBullhorn,
   FaChair,
+  FaCog,
 } from "react-icons/fa";
 import api from "../api";
 import { statusTone, requiresReason, ACTION_STYLE, isActive } from "../orderStatus";
@@ -30,6 +31,7 @@ import UsersPanel from "./UsersPanel";
 import PromosPanel from "./PromosPanel";
 import AnnouncementsPanel from "./AnnouncementsPanel";
 import SeatsPanel from "./SeatsPanel";
+import SettingsPanel from "./SettingsPanel";
 
 /** Admin-only sections beyond the day-to-day console. */
 const ADMIN_TABS = [
@@ -37,6 +39,7 @@ const ADMIN_TABS = [
   { key: "reports", label: "Reports", icon: FaChartPie },
   { key: "users", label: "Users", icon: FaUsers },
   { key: "seats", label: "Seats", icon: FaChair },
+  { key: "settings", label: "Settings", icon: FaCog },
   { key: "promos", label: "Promos", icon: FaTags },
   { key: "announcements", label: "Announcements", icon: FaBullhorn },
 ];
@@ -447,6 +450,7 @@ const refreshOrder = useCallback(async (orderId) => {
             {adminTab === "reports" && <ReportsPanel />}
             {adminTab === "users" && <UsersPanel />}
             {adminTab === "seats" && <SeatsPanel />}
+            {adminTab === "settings" && <SettingsPanel />}
             {adminTab === "promos" && <PromosPanel />}
             {adminTab === "announcements" && <AnnouncementsPanel />}
           </section>

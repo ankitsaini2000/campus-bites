@@ -9,11 +9,17 @@ import {
   FaSearch,
   FaPercent,
   FaBullhorn,
+  FaUsers,
+  FaClock,
+  FaStar,
 } from "react-icons/fa";
 import api from "../api";
 import { statusTone, isActive } from "../orderStatus";
 import OrderTimeline from "./OrderTimeline";
 import SeatsCard from "./SeatsCard";
+import SlotPicker from "./SlotPicker";
+import RatingModal from "./RatingModal";
+import GroupPanel from "./GroupPanel";
 import { createRealtimeClient } from "../realtime";
 
 const CART_KEY = "canteen_cart";
@@ -92,6 +98,18 @@ function FoodCard({ food, addToCart, isFavorite, onToggleFavorite, inCart = 0 })
           )}
         </div>
 
+        {/* Community rating, denormalized on the dish. */}
+        {food.ratingCount > 0 && (
+          <p
+            className="text-xs font-semibold text-amber-600 mb-2"
+            data-testid={`rating-${food._id}`}
+            title={`${food.ratingCount} rating${food.ratingCount > 1 ? "s" : ""}`}
+          >
+            <FaStar className="inline mr-1" />
+            {food.ratingAverage} ({food.ratingCount})
+          </p>
+        )}
+
         <div className="mt-auto flex items-end justify-between gap-2 pt-2">
           <p className="text-xl font-extrabold text-brand-600">₹{food.price}</p>
 
@@ -163,6 +181,13 @@ export default function StudentDashboard({ name, onLogout }) {
   // Live canteen seat map.
   const [seatMap, setSeatMap] = useState(null);
   const [seatsBusy, setSeatsBusy] = useState(false);
+  // Pre-order: the selected future pickup window.
+  const [preorderSlot, setPreorderSlot] = useState(null);
+  const [showSlotPicker, setShowSlotPicker] = useState(false);
+  // Rating dialog target (a dish from a completed order).
+  const [ratingTarget, setRatingTarget] = useState(null);
+  // Shared table order panel.
+  const [groupPanelOpen, setGroupPanelOpen] = useState(false);
 
   // Client-side menu browsing state (filters operate on the fetched menu).
   const [category, setCategory] = useState("All");
@@ -296,6 +321,8 @@ export default function StudentDashboard({ name, onLogout }) {
       onInventoryChanged: () => refreshFoods(),
       // A seat was taken or released; re-read the map.
       onSeatsChanged: () => refreshSeats(),
+      // The prep queue reshuffled; positions and ETAs changed.
+      onQueueChanged: () => refreshOrders(),
       onOrderChanged: (event) => {
         // A transition into "Ready" is a pickup moment worth calling out.
         if (event.status === "Ready" && event.previousStatus !== "Ready") {
@@ -500,9 +527,12 @@ export default function StudentDashboard({ name, onLogout }) {
           quantity: item.quantity,
         })),
         ...(appliedPromo ? { promoCode: appliedPromo.code } : {}),
+        ...(preorderSlot ? { slotId: preorderSlot._id } : {}),
       });
 
       clearCart();
+      setPreorderSlot(null);
+      setShowSlotPicker(false);
       setOrders((prev) => [res.data, ...prev]);
     } catch (err) {
       setError(err.message || "Failed to place order");
@@ -786,7 +816,17 @@ export default function StudentDashboard({ name, onLogout }) {
 
         {/* ===== Tray (cart) ===== */}
         <section className="mt-12">
-          <h2 className="text-2xl font-bold text-ink mb-4">Your Tray</h2>
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <h2 className="text-2xl font-bold text-ink">Your Tray</h2>
+            <button
+              type="button"
+              onClick={() => setGroupPanelOpen(true)}
+              data-testid="open-table-order"
+              className="flex items-center bg-white text-brand-700 hover:bg-brand-50 border border-brand-200 px-4 py-2 rounded-full shadow-sm font-semibold text-sm"
+            >
+              <FaUsers className="mr-1.5" /> Order for a table
+            </button>
+          </div>
           {cart.length === 0 ? (
             <p className="text-ink-mute">Your tray is empty.</p>
           ) : (
@@ -860,6 +900,48 @@ export default function StudentDashboard({ name, onLogout }) {
                 </div>
               </div>
 
+              {/* Pre-order: pick a future pickup window */}
+              <div className="mt-4">
+                {!preorderSlot ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowSlotPicker((v) => !v)}
+                    className="flex items-center text-sm font-semibold text-brand-700 hover:text-brand-800"
+                  >
+                    <FaClock className="mr-1.5" />
+                    {showSlotPicker
+                      ? "Hide pickup windows"
+                      : "Pre-order for a later pickup time"}
+                  </button>
+                ) : (
+                  <div className="flex items-center justify-between gap-3 bg-violet-50 border border-violet-300 rounded-xl p-3">
+                    <span className="text-sm font-semibold text-violet-800">
+                      <FaClock className="mr-1.5" />
+                      Pickup {preorderSlot.date}{" "}
+                      {preorderSlot.start} – {preorderSlot.end}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPreorderSlot(null)}
+                      className="text-violet-700 underline text-sm font-semibold"
+                    >
+                      Order now instead
+                    </button>
+                  </div>
+                )}
+                {showSlotPicker && !preorderSlot && (
+                  <div className="mt-3">
+                    <SlotPicker
+                      selected={null}
+                      onSelect={(slot) => {
+                        setPreorderSlot(slot);
+                        if (slot) setShowSlotPicker(false);
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+
               {/* Promo code */}
               <div className="mt-4">
                 {appliedPromo ? (
@@ -930,7 +1012,15 @@ export default function StudentDashboard({ name, onLogout }) {
                   data-testid="checkout"
                   className="flex-1 min-w-[160px] bg-brand-500 hover:bg-brand-600 text-white font-bold py-3 px-6 rounded-full shadow-soft"
                 >
-                  Checkout <FaShoppingCart className="inline ml-2" />
+                  {preorderSlot ? (
+                    <>
+                      Pre-order <FaClock className="inline ml-2" />
+                    </>
+                  ) : (
+                    <>
+                      Checkout <FaShoppingCart className="inline ml-2" />
+                    </>
+                  )}
                 </motion.button>
               </div>
             </motion.div>
@@ -962,6 +1052,39 @@ export default function StudentDashboard({ name, onLogout }) {
                     </span>
                   </div>
 
+                  {/* Live position and ETA in the prep queue. */}
+                  {order.queuePosition != null && isActive(order.status) && (
+                    <p
+                      className="text-xs font-semibold px-3 py-1.5 rounded-full bg-brand-100 text-brand-800 inline-flex items-center mb-2"
+                      data-testid="order-queue"
+                    >
+                      <FaClock className="mr-1.5" />
+                      Queue position #{order.queuePosition} · ready in ~
+                      {order.etaMinutes} min
+                    </p>
+                  )}
+
+                  {/* Pre-ordered: when the kitchen owes this order. */}
+                  {order.scheduledFor && (
+                    <p
+                      className="text-xs font-semibold px-3 py-1.5 rounded-full bg-violet-100 text-violet-800 inline-flex items-center mb-2"
+                      data-testid="order-scheduled"
+                    >
+                      <FaClock className="mr-1.5" />
+                      Pre-ordered for{" "}
+                      {new Date(order.scheduledFor).toLocaleDateString(undefined, {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                      })}{" "}
+                      at{" "}
+                      {new Date(order.scheduledFor).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  )}
+
                   {/* Progress timeline across the canonical lifecycle. */}
                   <OrderTimeline status={order.status} className="my-3" />
 
@@ -978,7 +1101,25 @@ export default function StudentDashboard({ name, onLogout }) {
                   {(order.items || []).map((item, i) => (
                     <div key={`${item.food}-${i}`} className="flex justify-between text-ink-soft text-sm mb-1">
                       <span>{item.name} × {item.quantity}</span>
-                      <span>₹{item.price * item.quantity}</span>
+                      <span className="flex items-center gap-2">
+                        ₹{item.price * item.quantity}
+                        {order.status === "Completed" && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setRatingTarget({
+                                _id: item.food,
+                                name: item.name,
+                              })
+                            }
+                            data-testid="rate-item"
+                            title={`Rate ${item.name}`}
+                            className="text-amber-500 hover:text-amber-600"
+                          >
+                            <FaStar />
+                          </button>
+                        )}
+                      </span>
                     </div>
                   ))}
 
@@ -1042,6 +1183,23 @@ export default function StudentDashboard({ name, onLogout }) {
           Campus Bites · University Canteen Network
         </div>
       </footer>
+      {/* ===== Table order panel ===== */}
+      {groupPanelOpen && (
+        <GroupPanel
+          foods={foods}
+          onClose={() => setGroupPanelOpen(false)}
+          onOrderPlaced={(order) => setOrders((prev) => [order, ...prev])}
+        />
+      )}
+
+      {/* ===== Rating dialog ===== */}
+      {ratingTarget && (
+        <RatingModal
+          food={ratingTarget}
+          onClose={() => setRatingTarget(null)}
+          onRated={() => refreshOrders()}
+        />
+      )}
     </div>
   );
 }

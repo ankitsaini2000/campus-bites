@@ -48,24 +48,6 @@ export default function KitchenDisplay({ name, onLogout, onBack }) {
     }
   }, []);
 
-  const refreshOrder = useCallback(async (orderId) => {
-    try {
-      const fresh = await api.get(`/orders/${orderId}`);
-      setOrders((prev) => {
-        const exists = prev.some((o) => o._id === orderId);
-        // Settled orders leave the live queue.
-        if (["Completed", "Cancelled", "Rejected"].includes(fresh.data.status)) {
-          return prev.filter((o) => o._id !== orderId);
-        }
-        return exists
-          ? prev.map((o) => (o._id === orderId ? fresh.data : o))
-          : [fresh.data, ...prev];
-      });
-    } catch {
-      /* a full refresh will reconcile */
-    }
-  }, []);
-
   useEffect(() => {
     refreshAll();
   }, [refreshAll]);
@@ -88,11 +70,17 @@ export default function KitchenDisplay({ name, onLogout, onBack }) {
           refreshAll();
         }
       },
-      onOrderChanged: (event) => refreshOrder(event.orderId),
+      onOrderChanged: () => {
+        // Any transition reshuffles the whole queue,
+        // so the board re-reads in full: positions and
+        // ETAs everywhere are only correct after a
+        // complete refresh.
+        refreshAll();
+      },
     });
     client.subscribeToCanteen();
     return () => client.close();
-  }, [refreshOrder, refreshAll]);
+  }, [refreshAll]);
 
   const updateStatus = async (orderId, status) => {
     setError("");
@@ -273,6 +261,31 @@ export default function KitchenDisplay({ name, onLogout, onBack }) {
                   >
                     {order.status}
                   </span>
+
+                  {/* Live position and ETA in the prep queue. */}
+                  {order.queuePosition != null && (
+                    <span
+                      className="self-start text-xs font-semibold px-3 py-1 rounded-full mb-3 bg-brand-100 text-brand-800"
+                      data-testid="kitchen-queue"
+                    >
+                      Position #{order.queuePosition} · ~
+                      {order.etaMinutes} min
+                    </span>
+                  )}
+
+                  {/* Pre-ordered: shows when the kitchen owes it. */}
+                  {order.scheduled && order.dueAt && (
+                    <span
+                      className="self-start text-xs font-semibold px-3 py-1 rounded-full mb-3 bg-violet-100 text-violet-800"
+                      data-testid="kitchen-due"
+                    >
+                      Due{" "}
+                      {new Date(order.dueAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  )}
 
                   <OrderTimeline status={order.status} className="mb-4" />
 

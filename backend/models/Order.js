@@ -94,10 +94,19 @@ const OrderSchema = new mongoose.Schema({
   cancelledAt: { type: Date, default: null },
   estimatedReadyAt: { type: Date, default: null },
   completedAt: { type: Date, default: null },
+
+  // ---- Additive: pre-ordering and table orders ----
+  // The pre-order window this order belongs to, if any.
+  slot: { type: mongoose.Schema.Types.ObjectId, ref: "TimeSlot", default: null },
+  // When a pre-ordered order is due (derived from the slot).
+  scheduledFor: { type: Date, default: null },
+  // The shared table order this order was checked out from.
+  group: { type: mongoose.Schema.Types.ObjectId, ref: "GroupOrder", default: null },
 });
 
 OrderSchema.index({ student: 1, date: -1 });
 OrderSchema.index({ status: 1, date: -1 });
+OrderSchema.index({ slot: 1, scheduledFor: 1 });
 
 const Order = mongoose.model("Order", OrderSchema);
 

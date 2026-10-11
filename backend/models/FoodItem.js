@@ -52,6 +52,11 @@ const foodSchema = new mongoose.Schema(
     // When an admin last acknowledged the low-stock condition for this item.
     // Drives "new alert" vs "already seen" without re-alerting every render.
     lowStockAcknowledgedAt: { type: Date, default: null },
+
+    // ---- Additive: denormalized rating summary, recomputed on every
+    // rating write (see routes/ratings.js) so the menu never aggregates.
+    ratingAverage: { type: Number, default: null, min: 1, max: 5 },
+    ratingCount: { type: Number, default: 0, min: 0 },
   },
   { timestamps: true }
 );

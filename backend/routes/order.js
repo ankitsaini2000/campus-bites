@@ -9,8 +9,11 @@ const {
 const ApiError = require("../utils/ApiError");
 const v = require("../utils/validators");
 const PromoCode = require("../models/PromoCode");
+const Settings = require("../models/Settings");
 const { emitOrderUpdate } = require("../realtime");
 const inventory = require("../services/inventory");
+const { validateSlot, slotDateTime } = require("./slots");
+const { withQueueInfo } = require("../utils/queue");
 const {
   STATUS,
   ORDER_STATUSES,
@@ -284,6 +287,14 @@ router.post("/", authMiddleware, async (req, res) => {
   const discount = promoApplied ? promoApplied.discount : 0;
   const total = v.roundMoney(subtotal - discount);
 
+  // ---- Optional pre-order window ------------------------------------
+  // Validated before the order is written: the slot must exist,
+  // start far enough in the future, and still have room.
+  let slot = null;
+  if (body.slotId !== undefined && body.slotId !== null) {
+    slot = await validateSlot(v.objectId(body.slotId, "slotId"));
+  }
+
   const order = await Order.create({
     student: req.user._id,
     items,
@@ -306,6 +317,8 @@ router.post("/", authMiddleware, async (req, res) => {
     estimatedReadyAt: maxPrep ? new Date(Date.now() + maxPrep * 60 * 1000) : null,
     pickupSlot: v.optionalString(body.pickupSlot, { field: "pickupSlot", max: 60 }) || null,
     notes: v.optionalString(body.notes, { field: "notes", max: 300 }) || null,
+    slot: slot ? slot._id : null,
+    scheduledFor: slot ? slotDateTime(slot) : null,
   });
 
   // ---------------------------------------------------------------------
@@ -370,10 +383,12 @@ router.get("/all", authMiddleware, adminOrStaffMiddleware, async (req, res) => {
   res.json(orders.map((o) => decorate(o, req.user)));
 });
 
-// Student: get their own orders
+// Student: get their own orders, with their live queue position and ETA
 router.get("/", authMiddleware, async (req, res) => {
   const orders = await Order.find({ student: req.user._id }).sort({ date: -1 });
-  res.json(orders.map((o) => decorate(o, req.user)));
+  const settings = await Settings.load();
+  const decorated = orders.map((o) => decorate(o, req.user));
+  res.json(await withQueueInfo(decorated, settings));
 });
 
 /**
@@ -388,16 +403,29 @@ router.get("/", authMiddleware, async (req, res) => {
  */
 router.get("/kitchen", authMiddleware, adminOrStaffMiddleware, async (req, res) => {
   const orders = await Order.find({ status: { $in: KITCHEN_STATUSES } })
-    .sort({ date: 1 }) // oldest first = longest waiting at the top
     .populate("student", "name email");
 
+  // Sort by when the kitchen actually needs to work: a pre-ordered
+  // order ranks by its window, a live order by its arrival.
+  const dueAt = (o) => {
+    if (o.scheduledFor && o.scheduledFor > new Date()) return o.scheduledFor;
+    return new Date(o.date);
+  };
+  orders.sort((a, b) => dueAt(a) - dueAt(b));
+
   const now = Date.now();
-  const feed = orders.map((o) => {
+  let feed = orders.map((o) => {
     const plain = decorate(o, req.user);
     // Baseline wait so the first paint is accurate before the client ticks.
     plain.waitSeconds = Math.max(0, Math.round((now - new Date(o.date).getTime()) / 1000));
+    plain.scheduled = Boolean(o.scheduledFor && o.scheduledFor > new Date());
+    plain.dueAt = o.scheduledFor ? new Date(o.scheduledFor).toISOString() : null;
     return plain;
   });
+
+  // Live queue positions and ETAs for the board.
+  const settings = await Settings.load();
+  feed = await withQueueInfo(feed, settings);
 
   res.json(feed);
 });
@@ -411,7 +439,9 @@ router.get("/:id", authMiddleware, async (req, res) => {
   if (!isStaff && order.student._id?.toString() !== req.user._id.toString()) {
     throw ApiError.forbidden("You can only view your own orders");
   }
-  res.json(decorate(order, req.user));
+  const settings = await Settings.load();
+  const [decoratedOrder] = await withQueueInfo([decorate(order, req.user)], settings);
+  res.json(decoratedOrder);
 });
 
 /**

@@ -15,6 +15,10 @@ const userRoutes = require("./routes/users");
 const promoRoutes = require("./routes/promos");
 const announcementRoutes = require("./routes/announcements");
 const seatRoutes = require("./routes/seats");
+const settingsRoutes = require("./routes/settings");
+const ratingRoutes = require("./routes/ratings");
+const slotRoutes = require("./routes/slots");
+const groupRoutes = require("./routes/groups");
 
 /**
  * Build the Express application.
@@ -81,6 +85,11 @@ function createApp() {
   app.use("/api/promos", promoRoutes);
   app.use("/api/announcements", announcementRoutes);
   app.use("/api/seats", seatRoutes);
+  app.use("/api/settings", settingsRoutes);
+  app.use("/api/slots", slotRoutes);
+  app.use("/api/groups", groupRoutes);
+  // Rating routes mount both /api/food/:id/rating(s) and /api/ratings/:id.
+  app.use("/api", ratingRoutes);
 
   // --- Production: serve the built frontend ---
   // In development the Vite dev server (port 5173) serves the UI and

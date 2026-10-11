@@ -4,53 +4,15 @@ const { authMiddleware, adminMiddleware } = require("../middleware/authMiddlewar
 const ApiError = require("../utils/ApiError");
 const v = require("../utils/validators");
 const { emitSeatUpdate } = require("../realtime");
+const {
+  currentCapacity,
+  ensureCapacity,
+  bootstrapIfEmpty,
+} = require("../utils/seats");
 
 const router = express.Router();
 
-/** Dining capacity of a fresh canteen, before an admin changes it. */
-const DEFAULT_CAPACITY = 40;
-
-/** The highest seat number — i.e. the current capacity. */
-async function currentCapacity() {
-  const highest = await Seat.findOne()
-    .sort({ seatNumber: -1 })
-    .select("seatNumber")
-    .lean();
-  return highest ? highest.seatNumber : 0;
-}
-
-/**
- * A canteen that has never been configured boots with the
- * default capacity. Every endpoint that reads or mutates the
- * map runs this first, so a fresh (or wiped) database is
- * never a special case.
- */
-async function bootstrapIfEmpty() {
-  if ((await currentCapacity()) === 0) {
-    await ensureCapacity(DEFAULT_CAPACITY);
-  }
-}
-
-/** Create any missing seats up to `capacity`. Idempotent. */
-async function ensureCapacity(capacity) {
-  const current = await currentCapacity();
-  if (capacity <= current) return current;
-
-  const missing = [];
-  for (let n = current + 1; n <= capacity; n += 1) {
-    missing.push({ seatNumber: n });
-  }
-  try {
-    await Seat.insertMany(missing);
-  } catch (err) {
-    // A concurrent bootstrap may have created some of these already;
-    // the unique index guarantees the end state is identical either way.
-    if (!/duplicate key/i.test(String(err.message))) throw err;
-  }
-  return capacity;
-}
-
-/** The seat map with a safe occupant projection (id, name, role only). */
+/** Populate the seat map with a safe occupant projection (id, name, role only). */
 async function seatMap() {
   const seats = await Seat.find()
     .sort({ seatNumber: 1 })

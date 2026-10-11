@@ -16,6 +16,7 @@ export function createRealtimeClient({
   onOrderChanged,
   onInventoryChanged,
   onSeatsChanged,
+  onQueueChanged,
   onStatusChange,
   subscribeToOrder,
   subscribeToCanteen,
@@ -125,6 +126,24 @@ export function createRealtimeClient({
       seenEvents.delete(oldest);
     }
     if (typeof onSeatsChanged === "function") onSeatsChanged(event);
+  });
+
+  /**
+   * The prep queue reshuffled. Any order transition can
+   * change another student's position and ETA, so the
+   * recipient re-reads its own orders. Advisory, like
+   * every other event here.
+   */
+  socket.on("queue:changed", (event) => {
+    if (!event?.eventId) return;
+    if (seenEvents.has(event.eventId)) return; // duplicate delivery
+
+    seenEvents.set(event.eventId, Date.now());
+    if (seenEvents.size > SEEN_MAX) {
+      const oldest = seenEvents.keys().next().value;
+      seenEvents.delete(oldest);
+    }
+    if (typeof onQueueChanged === "function") onQueueChanged(event);
   });
   // Reconnect recovery: the caller performs a full snapshot refresh.
   socket.io.on("reconnect", () => setStatus("reconnected"));

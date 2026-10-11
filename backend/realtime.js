@@ -198,6 +198,28 @@ function emitOrderUpdate({ orderId, studentId, status, previousStatus, at }) {
   // The live staff board.
   io.to(ROOM.canteen).emit("order:updated", event);
 
+  // Any transition can reshuffle the prep queue — a position or
+  // ETA somewhere else just changed — so every student with an
+  // active order (and the staff boards) is nudged to re-read
+  // queue positions. Advisory, like everything else here.
+  Order.find({ status: { $in: ["Pending", "Accepted", "Preparing"] } }, "student")
+    .lean()
+    .then((active) => {
+      const ids = [...new Set(active.map((o) => String(o.student)))];
+      const queueEvent = {
+        at: timestamp,
+        active: ids.length,
+        eventId: `queue:${timestamp}`,
+      };
+      for (const userId of ids) {
+        io.to(ROOM.user(userId)).emit("queue:changed", queueEvent);
+      }
+      io.to(ROOM.canteen).emit("queue:changed", queueEvent);
+    })
+    .catch(() => {
+      /* real-time is advisory; never break the request */
+    });
+
   return true;
 }
 
