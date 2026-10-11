@@ -12,14 +12,23 @@ const router = express.Router();
 /**
  * Campus sign-up policy.
  *
- * Only IET Lucknow addresses may register. The
- * OTP flow in routes/otp.js enforces it — the
- * code delivered to the inbox proves ownership,
- * so any roll-number format at the college
- * domain may register. Accounts that predate
- * the policy are untouched: login keeps
- * working for every existing address.
+ * Only IET Lucknow student IDs may register: the
+ * roll-number prefix 2400520100, the student's own
+ * digits, and the college mail domain. Accounts that
+ * predate this policy are untouched — login keeps
+ * working for every existing address; the gate
+ * applies to NEW registrations only.
  */
+const CAMPUS_EMAIL = new RegExp(config.auth.campusEmailPattern, "i");
+
+function assertCampusEmail(email) {
+  if (!CAMPUS_EMAIL.test(email)) {
+    throw ApiError.forbidden(
+      "Registration is open to IET Lucknow student IDs only " +
+        "(roll numbers like 2400520100107@ietlucknow.ac.in)"
+    );
+  }
+}
 
 /** Sign a session token for a user document. */
 function issueToken(user) {
@@ -28,20 +37,34 @@ function issueToken(user) {
   });
 }
 
-// Exported for routes/otp.js, which signs the
-// session the same way after verification.
-router.issueToken = issueToken;
+// Signup — PUBLIC.
+//
+// SECURITY: the request body's `role` is deliberately ignored. The original
+// implementation passed it straight to User.create(), letting any anonymous
+// caller register as an administrator. Administrators are provisioned through
+// `npm run seed:admin`, never through the public endpoint.
+router.post("/signup", authLimiter, async (req, res) => {
+  const body = v.object(req.body);
 
-// Signup — REMOVED. Registration now requires
-// email verification: POST /api/auth/request-otp
-// delivers a code to the campus address and
-// POST /api/auth/verify-otp creates the account
-// (see routes/otp.js). An unverified address can
-// never create or sign in to an account.
-// The body's `role` was always ignored —
-// administrators are provisioned through
-// `npm run seed:admin`, never through a public
-// endpoint.
+  const name = v.name(body.name);
+  const email = v.email(body.email);
+  const password = v.password(body.password);
+
+  // The campus gate runs after field validation so
+  // malformed input still reports the field error.
+  assertCampusEmail(email);
+
+  // `role` is not read from the body under any circumstances.
+  const user = await User.create({ name, email, password, role: "student" });
+
+  // NOTE: the request body is never logged — it contains the plaintext password.
+  console.log(`[auth] student registered: ${email}`);
+
+  res.status(201).json({
+    message: "User registered successfully",
+    user: user.toPublicJSON(),
+  });
+});
 
 // Login
 router.post("/login", authLimiter, async (req, res) => {

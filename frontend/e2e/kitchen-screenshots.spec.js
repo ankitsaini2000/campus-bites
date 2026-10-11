@@ -13,13 +13,10 @@ const STAFF = { name: "E2E Kitchen", email: "e2e.kitchen@college.edu", password:
 async function seed() {
   const student = {
     name: "KDS Screenshot",
-    email: `e2e.kdsshot.${Date.now()}@ietlucknow.ac.in`,
+    email: `e2e.kdsshot.${Date.now()}@college.edu`,
     password: "studentpass123",
   };
-  // The harness seeds the student directly: the
-  // public signup flow ends in an emailed OTP,
-  // which a browser test cannot read.
-  await fetch(`${API}/e2e/students`, {
+  await fetch(`${API}/auth/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(student),

@@ -2,32 +2,23 @@ const { test, before, after, beforeEach } = require("node:test");
 const assert = require("node:assert/strict");
 const mongoose = require("mongoose");
 const { api, startDb, resetDb, stopDb, makeUser } = require("./helpers");
-const { sentLog } = require("../services/otpMailer");
 
 before(startDb);
 after(stopDb);
 beforeEach(resetDb);
 
-/** The most recent code "sent" to an address (log mode). */
-function lastCodeFor(email) {
-  return [...sentLog].reverse().find((s) => s.email === email)?.code;
-}
-
-test("verification creates a student and ignores a client-supplied role", async () => {
-  await api()
-    .post("/api/auth/request-otp")
-    .send({ email: "2400520100101@ietlucknow.ac.in" });
-
-  const res = await api().post("/api/auth/verify-otp").send({
-    name: "Eve",
-    email: "2400520100101@ietlucknow.ac.in",
-    password: "password123",
-    otp: lastCodeFor("2400520100101@ietlucknow.ac.in"),
-    role: "admin", // attacker-controlled
-  });
+test("signup creates a student and ignores a client-supplied role", async () => {
+  const res = await api()
+    .post("/api/auth/signup")
+    .send({
+      name: "Eve",
+      email: "2400520100101@ietlucknow.ac.in",
+      password: "password123",
+      role: "admin", // attacker-controlled
+    });
 
   assert.equal(res.status, 201);
-  assert.equal(res.body.role, "student");
+  assert.equal(res.body.user.role, "student");
 
   // Confirm at the database level, not just in the response.
   const stored = await mongoose.connection
@@ -36,70 +27,61 @@ test("verification creates a student and ignores a client-supplied role", async 
   assert.equal(stored.role, "student");
 });
 
-test("verification cannot escalate via any privileged role value", async () => {
+test("signup cannot escalate via any privileged role value", async () => {
   const roles = ["admin", "staff", "Admin", "ADMIN", "superuser"];
   for (const [i, role] of roles.entries()) {
-    const email = `2400520100${100 + i}@ietlucknow.ac.in`;
-    await api().post("/api/auth/request-otp").send({ email });
-    const res = await api().post("/api/auth/verify-otp").send({
-      name: "Mallory",
-      email,
-      password: "password123",
-      otp: lastCodeFor(email),
-      role,
-    });
-    assert.equal(res.status, 201, `verification with role "${role}" failed`);
-    assert.equal(res.body.role, "student", `role "${role}" was not ignored`);
+    const res = await api()
+      .post("/api/auth/signup")
+      .send({
+        name: "Mallory",
+        // Index keeps the addresses unique.
+        email: `2400520100${100 + i}@ietlucknow.ac.in`,
+        password: "password123",
+        role,
+      });
+    assert.equal(res.status, 201, `signup with role "${role}" failed`);
+    assert.equal(res.body.user.role, "student", `role "${role}" was not ignored`);
   }
 });
 
-test("verification never returns or stores the password in plaintext", async () => {
-  const email = "2400520100102@ietlucknow.ac.in";
-  await api().post("/api/auth/request-otp").send({ email });
-  const res = await api().post("/api/auth/verify-otp").send({
-    name: "Safe",
-    email,
-    password: "password123",
-    otp: lastCodeFor(email),
-  });
+test("signup never returns or stores the password in plaintext", async () => {
+  const res = await api()
+    .post("/api/auth/signup")
+    .send({ name: "Safe", email: "2400520100102@ietlucknow.ac.in", password: "password123" });
 
   assert.equal(res.status, 201);
   assert.equal(res.body.password, undefined);
+  assert.equal(res.body.user.password, undefined);
 
-  const raw = await mongoose.connection.collection("users").findOne({ email });
+  const raw = await mongoose.connection.collection("users").findOne({ email: "2400520100102@ietlucknow.ac.in" });
   assert.notEqual(raw.password, "password123");
   assert.match(raw.password, /^\$2[aby]\$/); // bcrypt hash
 });
 
-test("request-otp refuses a registered email with 409", async () => {
-  const email = "2400520100103@ietlucknow.ac.in";
-  const first = await api().post("/api/auth/request-otp").send({ email });
+test("signup rejects a duplicate email with 409, not 500", async () => {
+  const payload = { name: "Dup", email: "2400520100103@ietlucknow.ac.in", password: "password123" };
+  const first = await api().post("/api/auth/signup").send(payload);
   assert.equal(first.status, 201);
-  await api().post("/api/auth/verify-otp").send({
-    name: "Dup",
-    email,
-    password: "password123",
-    otp: lastCodeFor(email),
-  });
 
-  // The account exists now — no code is spent on it.
-  const second = await api().post("/api/auth/request-otp").send({ email });
+  const second = await api().post("/api/auth/signup").send(payload);
   assert.equal(second.status, 409);
-  assert.match(second.body.message, /already registered/i);
+  assert.match(second.body.message, /already exists/i);
 });
 
-test("registration is limited to IET Lucknow addresses", async () => {
+test("signup is limited to IET Lucknow student IDs", async () => {
   const cases = [
     ["outsider@gmail.com", "outside the college"],
-    ["student@ietlucknow.edu", "wrong domain"],
-    ["student@ietlucknow.ac.in.uk", "lookalike domain"],
-    ["student@ietlucknow.ac.in.evil.com", "lookalike domain"],
+    ["240052010001@ietlucknow.edu", "wrong domain"],
+    ["24005209999@ietlucknow.ac.in", "wrong roll prefix"],
+    ["24005201001000@ietlucknow.ac.in", "too many digits"],
+    ["24005201001@ietlucknow.ac.in", "too few digits"],
+    ["24005201001@ietlucknow.ac.in.uk", "lookalike domain"],
   ];
 
   for (const [email, label] of cases) {
     const res = await api()
-      .post("/api/auth/request-otp")
-      .send({ email });
+      .post("/api/auth/signup")
+      .send({ name: "Gated", email, password: "password123" });
     assert.equal(res.status, 403, `${label}: ${email}`);
     assert.match(res.body.message, /IET Lucknow/i);
   }
@@ -111,47 +93,16 @@ test("registration is limited to IET Lucknow addresses", async () => {
   assert.equal(created, 0);
 });
 
-test("any roll-number format at the college domain may register", async () => {
-  // Ownership is proven by the OTP delivered to the
-  // inbox, so the part in front of the @ is free.
-  for (const local of [
-    "2400520100107",
-    "24005201001000",
-    "24005201001",
-    "random.name",
-  ]) {
-    const email = `${local}@ietlucknow.ac.in`;
-    const res = await api().post("/api/auth/request-otp").send({ email });
-    assert.equal(res.status, 201, local);
-  }
-});
-
-test("a campus address verifies end-to-end and signs in", async () => {
-  const email = "2400520100107@ietlucknow.ac.in";
-  const send = await api()
-    .post("/api/auth/request-otp")
-    .send({ email });
-  assert.equal(send.status, 201);
-  assert.equal(send.body.sent, true);
-  assert.ok(send.body.cooldownSeconds >= 1);
-
-  const res = await api().post("/api/auth/verify-otp").send({
-    name: "Campus",
-    email,
-    password: "password123",
-    otp: lastCodeFor(email),
-  });
+test("a valid campus ID is accepted", async () => {
+  const res = await api()
+    .post("/api/auth/signup")
+    .send({
+      name: "Campus",
+      email: "2400520100107@ietlucknow.ac.in",
+      password: "password123",
+    });
   assert.equal(res.status, 201);
-  assert.equal(res.body.email, email);
-  assert.equal(res.body.role, "student");
-  assert.ok(res.body.token);
-
-  // The session issued at verification works at once.
-  const me = await api()
-    .get("/api/auth/me")
-    .set("Authorization", `Bearer ${res.body.token}`);
-  assert.equal(me.status, 200);
-  assert.equal(me.body.email, email);
+  assert.equal(res.body.user.email, "2400520100107@ietlucknow.ac.in");
 });
 
 test("pre-policy accounts keep logging in", async () => {
@@ -165,16 +116,16 @@ test("pre-policy accounts keep logging in", async () => {
   assert.ok(res.body.token);
 });
 
-test("verification validates email, password length and name", async () => {
+test("signup validates email, password length and name", async () => {
   const cases = [
-    [{ name: "A", email: "not-an-email", password: "password123", otp: "123456" }, /valid email/i],
-    [{ name: "A", email: "b@ietlucknow.ac.in", password: "short", otp: "123456" }, /at least 8/i],
-    [{ name: "", email: "c@ietlucknow.ac.in", password: "password123", otp: "123456" }, /name is required/i],
-    [{ name: "A", email: "d@ietlucknow.ac.in", password: "password123x".repeat(200), otp: "123456" }, /at most 128/i],
+    [{ name: "A", email: "not-an-email", password: "password123" }, /valid email/i],
+    [{ name: "A", email: "b@college.edu", password: "short" }, /at least 8/i],
+    [{ name: "", email: "c@college.edu", password: "password123" }, /name is required/i],
+    [{ name: "A", email: "d@college.edu", password: "password123x".repeat(200) }, /at most 128/i],
   ];
 
   for (const [payload, matcher] of cases) {
-    const res = await api().post("/api/auth/verify-otp").send(payload);
+    const res = await api().post("/api/auth/signup").send(payload);
     assert.equal(res.status, 400, `expected 400 for ${JSON.stringify(payload)}`);
     if (matcher) assert.match(res.body.message, matcher);
   }

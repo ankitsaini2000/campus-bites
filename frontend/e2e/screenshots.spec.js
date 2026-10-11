@@ -13,20 +13,17 @@ const OUT = path.join(process.cwd(), "e2e", "screenshots");
 const ADMIN = { name: "E2E Admin", email: "e2e.admin@college.edu", password: "adminpass123" };
 const STUDENT = {
   name: "Screenshot Student",
-  email: `e2e.shots.${Date.now()}@ietlucknow.ac.in`,
+  email: `e2e.shots.${Date.now()}@college.edu`,
   password: "studentpass123",
 };
 
 async function seedOrder() {
-  // The harness seeds the student directly: the
-  // public signup flow ends in an emailed OTP,
-  // which a browser test cannot read.
-  const signup = await fetch(`${API}/e2e/students`, {
+  const signup = await fetch(`${API}/auth/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(STUDENT),
   });
-  if (!signup.ok) throw new Error(`student provisioning failed: ${signup.status}`);
+  if (!signup.ok) throw new Error(`signup failed: ${signup.status}`);
 
   const login = await fetch(`${API}/auth/login`, {
     method: "POST",

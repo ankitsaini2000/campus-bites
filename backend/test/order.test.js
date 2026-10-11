@@ -25,17 +25,12 @@ async function studentToken() {
   const email = `2400520100${String(
     Math.floor(Math.random() * 1000)
   ).padStart(3, "0")}@ietlucknow.ac.in`;
-  // Registration goes through the OTP flow;
-  // the log mailer records the code.
-  await api().post("/api/auth/request-otp").send({ email });
-  const { sentLog } = require("../services/otpMailer");
-  const entry = [...sentLog].reverse().find((s) => s.email === email);
-  const res = await api().post("/api/auth/verify-otp").send({
-    name: "Stud",
-    email,
-    password: "password123",
-    otp: entry.code,
-  });
+  await api()
+    .post("/api/auth/signup")
+    .send({ name: "Stud", email, password: "password123" });
+  const res = await api()
+    .post("/api/auth/login")
+    .send({ email, password: "password123" });
   return res.body.token;
 }
 
@@ -398,7 +393,7 @@ test("concurrent orders from the same user each get a correct total", async () =
 
 test("malformed JSON returns 400 instead of a crash", async () => {
   const res = await api()
-    .post("/api/auth/request-otp")
+    .post("/api/auth/signup")
     .set("Content-Type", "application/json")
     .send('{"name": "broken",,,}');
 

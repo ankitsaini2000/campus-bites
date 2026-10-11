@@ -17,25 +17,19 @@ const OTHER = { name: "E2E Other", email: "e2e.other@college.edu", password: "ot
 
 let studentCounter = 0;
 
-/**
- * Provision a brand-new student through the e2e
- * harness and return their credentials. The public
- * signup flow now ends in an emailed OTP, which a
- * browser test cannot read, so the harness seeds
- * the account directly.
- */
+/** Register a brand-new student through the API and return their credentials. */
 async function createStudent() {
   studentCounter += 1;
   const name = `E2E Student ${studentCounter}`;
-  const email = `e2e.s${studentCounter}.${Date.now()}@ietlucknow.ac.in`;
+  const email = `e2e.s${studentCounter}.${Date.now()}@college.edu`;
   const password = "studentpass123";
 
-  const res = await fetch(`${API}/e2e/students`, {
+  const res = await fetch(`${API}/auth/signup`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, email, password }),
   });
-  if (!res.ok) throw new Error(`student provisioning failed: ${res.status}`);
+  if (!res.ok) throw new Error(`student signup failed: ${res.status}`);
 
   return { name, email, password };
 }

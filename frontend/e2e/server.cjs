@@ -16,9 +16,6 @@ process.env.JWT_SECRET = "e2e-harness-secret-0123456789abcdefghij";
 process.env.MONGO_URI = "mongodb://127.0.0.1:27017/e2ePlaceholder";
 process.env.RATE_LIMIT_ENABLED = "false";
 process.env.REALTIME_ENABLED = "true";
-// Codes go to the harness log, never to a
-// real mailbox (the anypost key is not set).
-process.env.OTP_MAILER = "log";
 // The Playwright preview server runs on 4173.
 process.env.CORS_ORIGINS = [
   "http://localhost:4173",
@@ -69,35 +66,6 @@ const MENU = [
   console.log("[e2e] seeded menu");
 
   const app = createApp();
-
-  // Test-only student provisioning. This route is added by the
-  // e2e harness AFTER the app is built, so it exists only while
-  // Playwright drives the suite — the shipped server (server.js)
-  // never mounts it. The public signup flow now ends in an
-  // emailed OTP, which a browser test cannot read, so the
-  // harness seeds test students directly instead.
-  app.post("/api/e2e/students", async (req, res) => {
-    const { name, email, password } = req.body || {};
-    if (!name || !email || !password) {
-      return res
-        .status(400)
-        .json({ message: "name, email and password are required" });
-    }
-    try {
-      const user = await User.create({
-        name,
-        email,
-        password,
-        role: "student",
-      });
-      res.status(201).json({ id: user._id, email: user.email });
-    } catch (err) {
-      res
-        .status(err.code === 11000 ? 409 : 400)
-        .json({ message: err.message });
-    }
-  });
-
   const server = http.createServer(app);
   attachRealtime(server);
 
