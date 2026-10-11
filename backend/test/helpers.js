@@ -49,7 +49,11 @@ async function makeUser({ name = "Test User", email, password = "password123", r
 async function registerAndLogin(overrides = {}) {
   const creds = {
     name: "Test Student",
-    email: `student-${Math.random().toString(36).slice(2, 10)}@college.edu`,
+    // The campus gate only admits IET Lucknow
+    // IDs, so tests register as campus students.
+    email: `2400520100${Math.floor(
+      Math.random() * 100000000
+    )}@ietlucknow.ac.in`,
     password: "password123",
     ...overrides,
   };

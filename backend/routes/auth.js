@@ -9,6 +9,27 @@ const v = require("../utils/validators");
 
 const router = express.Router();
 
+/**
+ * Campus sign-up policy.
+ *
+ * Only IET Lucknow student IDs may register: the
+ * roll-number prefix 2400520100, the student's own
+ * digits, and the college mail domain. Accounts that
+ * predate this policy are untouched — login keeps
+ * working for every existing address; the gate
+ * applies to NEW registrations only.
+ */
+const CAMPUS_EMAIL = new RegExp(config.auth.campusEmailPattern, "i");
+
+function assertCampusEmail(email) {
+  if (!CAMPUS_EMAIL.test(email)) {
+    throw ApiError.forbidden(
+      "Registration is open to IET Lucknow student IDs only " +
+        "(2400520100…@ietlucknow.ac.in)"
+    );
+  }
+}
+
 /** Sign a session token for a user document. */
 function issueToken(user) {
   return jwt.sign({ id: user._id.toString() }, config.jwt.secret, {
@@ -28,6 +49,10 @@ router.post("/signup", authLimiter, async (req, res) => {
   const name = v.name(body.name);
   const email = v.email(body.email);
   const password = v.password(body.password);
+
+  // The campus gate runs after field validation so
+  // malformed input still reports the field error.
+  assertCampusEmail(email);
 
   // `role` is not read from the body under any circumstances.
   const user = await User.create({ name, email, password, role: "student" });

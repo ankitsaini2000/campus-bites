@@ -106,11 +106,18 @@ export default function Signup({ switchPage, setUserRole, setUserName }) {
                 id="signup-email"
                 type="email"
                 autoComplete="email"
-                placeholder="Email"
+                placeholder="2400520100…@ietlucknow.ac.in"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-ink placeholder:text-ink-mute/60 focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none transition"
               />
+              <p className="mt-1.5 text-xs text-ink-mute">
+                Use your IET Lucknow student ID — only{" "}
+                <span className="font-semibold text-ink-soft">
+                  2400520100…@ietlucknow.ac.in
+                </span>{" "}
+                addresses can register.
+              </p>
             </div>
 
             <div>
@@ -151,7 +158,8 @@ export default function Signup({ switchPage, setUserRole, setUserName }) {
 
         <p className="mt-4 flex items-start justify-center gap-2 text-xs text-ink-mute text-center">
           <FaInfoCircle className="mt-0.5 shrink-0 text-brand-400" />
-          Student accounts only — staff and admin accounts are created by canteen administrators.
+          IET Lucknow student accounts only — staff and admin accounts are
+          created by canteen administrators.
         </p>
       </div>
     </div>

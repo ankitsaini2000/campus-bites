@@ -12,7 +12,7 @@ test("signup creates a student and ignores a client-supplied role", async () => 
     .post("/api/auth/signup")
     .send({
       name: "Eve",
-      email: "eve@college.edu",
+      email: "24005201001@ietlucknow.ac.in",
       password: "password123",
       role: "admin", // attacker-controlled
     });
@@ -23,7 +23,7 @@ test("signup creates a student and ignores a client-supplied role", async () => 
   // Confirm at the database level, not just in the response.
   const stored = await mongoose.connection
     .collection("users")
-    .findOne({ email: "eve@college.edu" });
+    .findOne({ email: "24005201001@ietlucknow.ac.in" });
   assert.equal(stored.role, "student");
 });
 
@@ -34,9 +34,8 @@ test("signup cannot escalate via any privileged role value", async () => {
       .post("/api/auth/signup")
       .send({
         name: "Mallory",
-        // Index keeps the addresses unique: "admin" and "Admin" would
-        // otherwise collide once the email is lowercased.
-        email: `mallory-${i}-${role.toLowerCase()}@college.edu`,
+        // Index keeps the addresses unique.
+        email: `2400520100${10 + i}@ietlucknow.ac.in`,
         password: "password123",
         role,
       });
@@ -48,25 +47,71 @@ test("signup cannot escalate via any privileged role value", async () => {
 test("signup never returns or stores the password in plaintext", async () => {
   const res = await api()
     .post("/api/auth/signup")
-    .send({ name: "Safe", email: "safe@college.edu", password: "password123" });
+    .send({ name: "Safe", email: "24005201002@ietlucknow.ac.in", password: "password123" });
 
   assert.equal(res.status, 201);
   assert.equal(res.body.password, undefined);
   assert.equal(res.body.user.password, undefined);
 
-  const raw = await mongoose.connection.collection("users").findOne({ email: "safe@college.edu" });
+  const raw = await mongoose.connection.collection("users").findOne({ email: "24005201002@ietlucknow.ac.in" });
   assert.notEqual(raw.password, "password123");
   assert.match(raw.password, /^\$2[aby]\$/); // bcrypt hash
 });
 
 test("signup rejects a duplicate email with 409, not 500", async () => {
-  const payload = { name: "Dup", email: "dup@college.edu", password: "password123" };
+  const payload = { name: "Dup", email: "24005201003@ietlucknow.ac.in", password: "password123" };
   const first = await api().post("/api/auth/signup").send(payload);
   assert.equal(first.status, 201);
 
   const second = await api().post("/api/auth/signup").send(payload);
   assert.equal(second.status, 409);
   assert.match(second.body.message, /already exists/i);
+});
+
+test("signup is limited to IET Lucknow student IDs", async () => {
+  const cases = [
+    ["outsider@gmail.com", "outside the college"],
+    ["24005201001@ietlucknow.edu", "wrong domain"],
+    ["24005209999@ietlucknow.ac.in", "wrong roll prefix"],
+    ["24005201001@ietlucknow.ac.in.uk", "lookalike domain"],
+  ];
+
+  for (const [email, label] of cases) {
+    const res = await api()
+      .post("/api/auth/signup")
+      .send({ name: "Gated", email, password: "password123" });
+    assert.equal(res.status, 403, `${label}: ${email}`);
+    assert.match(res.body.message, /IET Lucknow/i);
+  }
+
+  // Nothing was created by the refused attempts.
+  const created = await mongoose.connection
+    .collection("users")
+    .countDocuments({ email: /gmail|ietlucknow/ });
+  assert.equal(created, 0);
+});
+
+test("a valid campus ID is accepted", async () => {
+  const res = await api()
+    .post("/api/auth/signup")
+    .send({
+      name: "Campus",
+      email: "240052010042@ietlucknow.ac.in",
+      password: "password123",
+    });
+  assert.equal(res.status, 201);
+  assert.equal(res.body.user.email, "240052010042@ietlucknow.ac.in");
+});
+
+test("pre-policy accounts keep logging in", async () => {
+  // The gate applies to registrations, not logins:
+  // an address created before the policy stays usable.
+  await makeUser({ name: "Legacy", email: "legacy@gmail.com", password: "password123" });
+  const res = await api()
+    .post("/api/auth/login")
+    .send({ email: "legacy@gmail.com", password: "password123" });
+  assert.equal(res.status, 200);
+  assert.ok(res.body.token);
 });
 
 test("signup validates email, password length and name", async () => {

@@ -22,7 +22,9 @@ async function adminToken() {
  * Returning the email alongside lets a test assert on a specific account.
  */
 async function studentToken() {
-  const email = `s-${Math.random().toString(36).slice(2, 8)}@college.edu`;
+  const email = `2400520100${Math.floor(
+    Math.random() * 1000000
+  )}@ietlucknow.ac.in`;
   await api()
     .post("/api/auth/signup")
     .send({ name: "Stud", email, password: "password123" });

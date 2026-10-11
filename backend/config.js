@@ -107,6 +107,15 @@ const config = {
     // silently lost.
     statusHistoryLimit: envInt("ORDER_STATUS_HISTORY_LIMIT", 100),
   },
+
+  // Sign-up policy. New registrations are limited to campus
+  // student IDs; the value is a RegExp source string so
+  // config stays serializable. The auth route compiles it.
+  auth: {
+    campusEmailPattern:
+      process.env.AUTH_EMAIL_PATTERN ||
+      "^2400520100\\d+@ietlucknow\\.ac\\.in$",
+  },
 };
 
 module.exports = config;

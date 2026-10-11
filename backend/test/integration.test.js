@@ -119,7 +119,7 @@ test("health endpoint responds", async () => {
 
 test("full workflow: student registers, browses, orders; admin fulfils", async () => {
   // --- student registers and signs in ---
-  const studentEmail = "e2e-student@college.edu";
+  const studentEmail = "240052010001@ietlucknow.ac.in";
   const signup = await call("POST", "/api/auth/signup", {
     body: { name: "E2E Student", email: studentEmail, password: STUDENT_PASSWORD },
   });
@@ -143,7 +143,7 @@ test("full workflow: student registers, browses, orders; admin fulfils", async (
   const escalation = await call("POST", "/api/auth/signup", {
     body: {
       name: "Escalator",
-      email: "escalator@college.edu",
+      email: "240052010002@ietlucknow.ac.in",
       password: STUDENT_PASSWORD,
       role: "admin",
     },
@@ -224,7 +224,7 @@ test("full workflow: student registers, browses, orders; admin fulfils", async (
 });
 
 test("a session survives a simulated page refresh and then expires cleanly", async () => {
-  const email = "refresh@college.edu";
+  const email = "240052010003@ietlucknow.ac.in";
   await call("POST", "/api/auth/signup", {
     body: { name: "Refresh User", email, password: STUDENT_PASSWORD },
   });
@@ -268,7 +268,7 @@ test("an unknown route returns JSON 404 rather than an HTML error page", async (
   assert.match(res.body.message, /Route not found/);
 });
 test("Phase 2: full lifecycle over HTTP, driven by a real server", async () => {
-  const studentEmail = "lifecycle-student@college.edu";
+  const studentEmail = "240052010004@ietlucknow.ac.in";
   await call("POST", "/api/auth/signup", {
     body: { name: "Lifecycle Student", email: studentEmail, password: STUDENT_PASSWORD },
   });
@@ -324,7 +324,7 @@ test("Phase 2: full lifecycle over HTTP, driven by a real server", async () => {
 });
 
 test("Phase 2: student cancellation and idempotency over HTTP", async () => {
-  const studentEmail = "cancel-student@college.edu";
+  const studentEmail = "240052010005@ietlucknow.ac.in";
   await call("POST", "/api/auth/signup", {
     body: { name: "Cancel Student", email: studentEmail, password: STUDENT_PASSWORD },
   });
@@ -364,7 +364,7 @@ test("Phase 2: student cancellation and idempotency over HTTP", async () => {
   assert.equal(again.body.statusHistory.filter((h) => h.status === "Cancelled").length, 1);
 
   // Another student cannot cancel it.
-  const otherEmail = "other-student@college.edu";
+  const otherEmail = "240052010006@ietlucknow.ac.in";
   await call("POST", "/api/auth/signup", {
     body: { name: "Other", email: otherEmail, password: STUDENT_PASSWORD },
   });
@@ -379,7 +379,7 @@ test("Phase 2: student cancellation and idempotency over HTTP", async () => {
 });
 
 test("Phase 2: concurrent conflicting transitions resolve to one winner", async () => {
-  const studentEmail = "race-student@college.edu";
+  const studentEmail = "240052010007@ietlucknow.ac.in";
   await call("POST", "/api/auth/signup", {
     body: { name: "Race Student", email: studentEmail, password: STUDENT_PASSWORD },
   });
