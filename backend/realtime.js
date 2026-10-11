@@ -29,6 +29,7 @@ const ROOM = {
   user: (userId) => `user:${userId}`,
   order: (orderId) => `order:${orderId}`,
   canteen: "canteen",
+  seats: "seats",
 };
 
 const isStaffRole = (role) => role === "admin" || role === "staff";
@@ -103,6 +104,11 @@ function attachRealtime(httpServer) {
     // Every socket joins its own private room, so a user with several tabs
     // sees their own order changes without subscribing.
     socket.join(ROOM.user(user.id));
+
+    // Everyone follows the seat map. It holds no private data — only
+    // seat numbers and occupant names — so every authenticated socket
+    // is authorized for it.
+    socket.join(ROOM.seats);
 
     /**
      * Watch one order. Authorized against the database on every request —
@@ -196,6 +202,33 @@ function emitOrderUpdate({ orderId, studentId, status, previousStatus, at }) {
 }
 
 /**
+ * Broadcast that the seat map changed.
+ *
+ * Advisory, exactly like order events: recipients re-read the map
+ * through GET /api/seats, so a dropped or duplicated frame can never
+ * leave the UI showing anything the database does not say. The
+ * payload carries counts only — no occupant details.
+ *
+ * Returns false when no server is attached (REST-only mode).
+ */
+function emitSeatUpdate({ capacity, occupied, available }) {
+  if (!io) return false;
+
+  const at = new Date().toISOString();
+  const payload = {
+    capacity,
+    occupied,
+    available,
+    at,
+    // Stable across duplicate deliveries, so clients can drop repeats.
+    eventId: `seats:${at}:${occupied}:${capacity}`,
+  };
+
+  io.to(ROOM.seats).emit("seats:changed", payload);
+  return true;
+}
+
+/**
  * Broadcast that an inventory figure changed.
  *
  * Sent ONLY to the staff `canteen` room, never to student rooms, so stock
@@ -239,6 +272,7 @@ module.exports = {
   attachRealtime,
   emitOrderUpdate,
   emitInventoryUpdate,
+  emitSeatUpdate,
   isRealtimeActive,
   resetRealtime,
   ROOM,

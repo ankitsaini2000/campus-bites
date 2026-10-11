@@ -14,6 +14,7 @@ const analyticsRoutes = require("./routes/analytics");
 const userRoutes = require("./routes/users");
 const promoRoutes = require("./routes/promos");
 const announcementRoutes = require("./routes/announcements");
+const seatRoutes = require("./routes/seats");
 
 /**
  * Build the Express application.
@@ -79,6 +80,7 @@ function createApp() {
   app.use("/api/users", userRoutes);
   app.use("/api/promos", promoRoutes);
   app.use("/api/announcements", announcementRoutes);
+  app.use("/api/seats", seatRoutes);
 
   // --- Production: serve the built frontend ---
   // In development the Vite dev server (port 5173) serves the UI and

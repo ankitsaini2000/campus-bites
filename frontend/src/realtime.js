@@ -15,6 +15,7 @@ import { getToken } from "./api";
 export function createRealtimeClient({
   onOrderChanged,
   onInventoryChanged,
+  onSeatsChanged,
   onStatusChange,
   subscribeToOrder,
   subscribeToCanteen,
@@ -106,6 +107,24 @@ export function createRealtimeClient({
       seenEvents.delete(oldest);
     }
     if (typeof onInventoryChanged === "function") onInventoryChanged(event);
+  });
+
+  /**
+   * Seat-map notifications. The server broadcasts these to
+   * every authenticated socket — the map holds no private
+   * data. Advisory, exactly like order events: the caller
+   * re-reads the map through GET /api/seats.
+   */
+  socket.on("seats:changed", (event) => {
+    if (!event?.eventId) return;
+    if (seenEvents.has(event.eventId)) return; // duplicate delivery
+
+    seenEvents.set(event.eventId, Date.now());
+    if (seenEvents.size > SEEN_MAX) {
+      const oldest = seenEvents.keys().next().value;
+      seenEvents.delete(oldest);
+    }
+    if (typeof onSeatsChanged === "function") onSeatsChanged(event);
   });
   // Reconnect recovery: the caller performs a full snapshot refresh.
   socket.io.on("reconnect", () => setStatus("reconnected"));

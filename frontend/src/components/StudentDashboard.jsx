@@ -13,6 +13,7 @@ import {
 import api from "../api";
 import { statusTone, isActive } from "../orderStatus";
 import OrderTimeline from "./OrderTimeline";
+import SeatsCard from "./SeatsCard";
 import { createRealtimeClient } from "../realtime";
 
 const CART_KEY = "canteen_cart";
@@ -159,6 +160,9 @@ export default function StudentDashboard({ name, onLogout }) {
   // Canteen-wide announcements from the admin.
   const [announcements, setAnnouncements] = useState([]);
   const [dismissed, setDismissed] = useState(() => new Set());
+  // Live canteen seat map.
+  const [seatMap, setSeatMap] = useState(null);
+  const [seatsBusy, setSeatsBusy] = useState(false);
 
   // Client-side menu browsing state (filters operate on the fetched menu).
   const [category, setCategory] = useState("All");
@@ -183,6 +187,19 @@ export default function StudentDashboard({ name, onLogout }) {
       setFoods(res.data || []);
     } catch (err) {
       setError(err.message || "Could not load the menu");
+    }
+  }, []);
+
+  /**
+   * Re-read the seat map. Also used when a seat
+   * change arrives over the socket.
+   */
+  const refreshSeats = useCallback(async () => {
+    try {
+      const res = await api.get("/seats");
+      setSeatMap(res.data || null);
+    } catch {
+      // The seat map is non-essential; the menu keeps working.
     }
   }, []);
 
@@ -221,6 +238,7 @@ export default function StudentDashboard({ name, onLogout }) {
       fetchOrders(),
       fetchFavorites(),
       fetchAnnouncements(),
+      refreshSeats(),
     ]).finally(() => {
       if (!cancelled) setLoading(false);
     });
@@ -228,7 +246,7 @@ export default function StudentDashboard({ name, onLogout }) {
     return () => {
       cancelled = true;
     };
-  }, [refreshFoods]);
+  }, [refreshFoods, refreshSeats]);
   /**
    * Re-read a single order from the authoritative REST endpoint.
    *
@@ -276,6 +294,8 @@ export default function StudentDashboard({ name, onLogout }) {
       },
       // A stock change alters what is orderable; re-read the menu.
       onInventoryChanged: () => refreshFoods(),
+      // A seat was taken or released; re-read the map.
+      onSeatsChanged: () => refreshSeats(),
       onOrderChanged: (event) => {
         // A transition into "Ready" is a pickup moment worth calling out.
         if (event.status === "Ready" && event.previousStatus !== "Ready") {
@@ -290,7 +310,32 @@ export default function StudentDashboard({ name, onLogout }) {
     });
 
     return () => client.close();
-  }, [refreshOrder, refreshOrders, refreshFoods]);
+  }, [refreshOrder, refreshOrders, refreshFoods, refreshSeats]);
+
+  const takeSeat = useCallback(async () => {
+    setSeatsBusy(true);
+    try {
+      const res = await api.post("/seats/take");
+      setSeatMap(res.data);
+    } catch (err) {
+      setError(err.message || "Could not take a seat");
+    } finally {
+      setSeatsBusy(false);
+    }
+  }, []);
+
+  const leaveSeat = useCallback(async () => {
+    setSeatsBusy(true);
+    try {
+      const res = await api.post("/seats/leave");
+      setSeatMap(res.data);
+    } catch (err) {
+      setError(err.message || "Could not leave your seat");
+    } finally {
+      setSeatsBusy(false);
+    }
+  }, []);
+
   const addToCart = useCallback((food) => {
     // Client-side guard for a friendly message; the server is authoritative.
     if (typeof food.availableQty === "number") {
@@ -646,6 +691,17 @@ export default function StudentDashboard({ name, onLogout }) {
             {error}
           </p>
         )}
+
+        {/* ===== Canteen seats ===== */}
+        <div className="mb-8">
+          <SeatsCard
+            seats={seatMap}
+            mySeat={seatMap?.mySeat ?? null}
+            onTake={takeSeat}
+            onLeave={leaveSeat}
+            busy={seatsBusy}
+          />
+        </div>
 
         {/* ===== Menu ===== */}
         <section>
