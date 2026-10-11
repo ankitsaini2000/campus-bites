@@ -33,6 +33,10 @@ class ApiError extends Error {
     return new ApiError(409, message);
   }
 
+  static badGateway(message) {
+    return new ApiError(502, message);
+  }
+
   static tooManyRequests(message = "Too many requests, please try again later") {
     return new ApiError(429, message);
   }

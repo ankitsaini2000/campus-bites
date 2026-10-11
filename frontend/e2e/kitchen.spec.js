@@ -17,14 +17,17 @@ let n = 0;
 async function createStudent() {
   n += 1;
   const name = `KDS Student ${n}`;
-  const email = `e2e.kds${n}.${Date.now()}@college.edu`;
+  const email = `e2e.kds${n}.${Date.now()}@ietlucknow.ac.in`;
   const password = "studentpass123";
-  const res = await fetch(`${API}/auth/signup`, {
+  // The harness seeds the student directly: the
+  // public signup flow ends in an emailed OTP,
+  // which a browser test cannot read.
+  const res = await fetch(`${API}/e2e/students`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, email, password }),
   });
-  if (!res.ok) throw new Error(`signup failed: ${res.status}`);
+  if (!res.ok) throw new Error(`student provisioning failed: ${res.status}`);
   return { name, email, password };
 }
 

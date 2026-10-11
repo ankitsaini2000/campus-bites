@@ -45,24 +45,50 @@ async function makeUser({ name = "Test User", email, password = "password123", r
   return User.create({ name, email, password, role });
 }
 
-/** Register + log in over HTTP, returning the token and user payload. */
+/**
+ * Register a student over HTTP through the full
+ * OTP verification flow and return the session.
+ *
+ * The mailer runs in "log" mode under NODE_ENV=test,
+ * so the code is read from the in-memory send log
+ * — no real email is spent.
+ */
 async function registerAndLogin(overrides = {}) {
   const creds = {
     name: "Test Student",
-    // The campus gate only admits IET Lucknow
-    // IDs (prefix + exactly three digits), so
-    // tests register as campus students.
+    // The campus gate admits IET Lucknow
+    // addresses, so tests register as
+    // campus students.
     email: `2400520100${String(
       Math.floor(Math.random() * 1000)
     ).padStart(3, "0")}@ietlucknow.ac.in`,
     password: "password123",
     ...overrides,
   };
-  await api().post("/api/auth/signup").send(creds);
-  const res = await api().post("/api/auth/login").send({
+  const send = await api()
+    .post("/api/auth/request-otp")
+    .send({ email: creds.email });
+  if (send.status !== 201) {
+    throw new Error(
+      `request-otp failed: ${send.status} ${send.body?.message}`
+    );
+  }
+  const { sentLog } = require("../services/otpMailer");
+  const entry = [...sentLog]
+    .reverse()
+    .find((s) => s.email === creds.email);
+  if (!entry) throw new Error("no OTP was logged");
+  const res = await api().post("/api/auth/verify-otp").send({
     email: creds.email,
+    otp: entry.code,
+    name: creds.name,
     password: creds.password,
   });
+  if (res.status !== 201) {
+    throw new Error(
+      `verify-otp failed: ${res.status} ${res.body?.message}`
+    );
+  }
   return { token: res.body.token, ...res.body, credentials: creds };
 }
 

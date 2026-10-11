@@ -108,15 +108,36 @@ const config = {
     statusHistoryLimit: envInt("ORDER_STATUS_HISTORY_LIMIT", 100),
   },
 
-  // Sign-up policy. New registrations are limited to campus
-  // student IDs; the value is a RegExp source string so
-  // config stays serializable. The auth route compiles it.
-  // Roll numbers are the 2400520100 prefix plus exactly
-  // three digits, e.g. 2400520100107@ietlucknow.ac.in.
+  // Sign-up policy. New registrations are limited to
+  // campus addresses; ownership is proven by an
+  // OTP delivered to that inbox, so any
+  // roll-number format at the domain is fine.
   auth: {
     campusEmailPattern:
       process.env.AUTH_EMAIL_PATTERN ||
-      "^2400520100\\d{3}@ietlucknow\\.ac\\.in$",
+      "^[^@\\s]+@ietlucknow\\.ac\\.in$",
+  },
+
+  // Email verification (OTP) policy. The provider's
+  // free tier caps sends at 100 emails a day, so
+  // the app holds 10 back and enforces per-email,
+  // per-IP and global limits before every send.
+  otp: {
+    // "anypost" sends through the Anypost HTTP
+    // API; "log" records the code in memory
+    // instead (tests and development) so no
+    // real email is spent.
+    mailer: process.env.OTP_MAILER || (isTest ? "log" : "anypost"),
+    anypostApiKey: process.env.ANYPOST_API_KEY || "",
+    anypostFrom:
+      process.env.OTP_FROM_EMAIL || "campusbites@campusbites.in",
+    cooldownSeconds: envInt("OTP_COOLDOWN_SECONDS", 60),
+    perHour: envInt("OTP_PER_HOUR", 3),
+    perDay: envInt("OTP_PER_DAY", 5),
+    perIpDay: envInt("OTP_PER_IP_DAY", 20),
+    globalDaily: envInt("OTP_GLOBAL_DAILY", 90),
+    expiresMinutes: envInt("OTP_EXPIRES_MINUTES", 10),
+    maxAttempts: envInt("OTP_MAX_ATTEMPTS", 5),
   },
 };
 

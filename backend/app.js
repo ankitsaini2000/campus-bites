@@ -19,6 +19,7 @@ const settingsRoutes = require("./routes/settings");
 const ratingRoutes = require("./routes/ratings");
 const slotRoutes = require("./routes/slots");
 const groupRoutes = require("./routes/groups");
+const otpRoutes = require("./routes/otp");
 
 /**
  * Build the Express application.
@@ -77,6 +78,10 @@ function createApp() {
 
   app.use("/api", apiLimiter);
   app.use("/api/auth", authRoutes);
+  // OTP verification also lives under /api/auth
+  // (request-otp / verify-otp); paths do not
+  // overlap with the routes above.
+  app.use("/api/auth", otpRoutes);
   app.use("/api/food", foodRoutes);
   app.use("/api/orders", orderRoutes);
   app.use("/api/inventory", inventoryRoutes);

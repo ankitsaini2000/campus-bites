@@ -18,6 +18,7 @@ const SECRET = "integration-test-secret-0123456789abcdef";
 
 let mongod;
 let server;
+let serverOutput = "";
 let adminEmail = "e2e-admin@college.edu";
 const ADMIN_PASSWORD = "admin-password-1";
 const STUDENT_PASSWORD = "student-password-1";
@@ -58,6 +59,33 @@ async function call(method, path, { token, body } = {}) {
   return { status: res.status, body: parsed };
 }
 
+/** The last OTP the server logged for an address. */
+function lastCodeFor(email) {
+  const marker = `[otp] verification code for ${email}:`;
+  const lines = serverOutput
+    .split("\n")
+    .filter((l) => l.includes(marker));
+  const line = lines[lines.length - 1];
+  if (!line) return null;
+  const m = line.match(/(\d{6})\s*$/);
+  return m ? m[1] : null;
+}
+
+/** Register a student through the full OTP flow over HTTP. */
+async function registerStudent(name, email, password) {
+  const send = await call("POST", "/api/auth/request-otp", {
+    body: { email },
+  });
+  assert.equal(send.status, 201, send.body?.message);
+  const otp = lastCodeFor(email);
+  assert.ok(otp, "the server should have logged a code");
+  const verify = await call("POST", "/api/auth/verify-otp", {
+    body: { name, email, password, otp },
+  });
+  assert.equal(verify.status, 201, verify.body?.message);
+  return verify.body.token;
+}
+
 before(async () => {
   mongod = await MongoMemoryServer.create();
   const uri = mongod.getUri("canteenE2E");
@@ -77,6 +105,11 @@ before(async () => {
   });
 
   server.stderr.on("data", () => {}); // swallow noisy logs
+  // The log-mode mailer prints each code to stdout;
+  // capture it so tests can read the code back.
+  server.stdout.on("data", (chunk) => {
+    serverOutput += chunk.toString();
+  });
   await waitForHealth();
 
   // Provision the admin through the documented seed path.
@@ -118,19 +151,13 @@ test("health endpoint responds", async () => {
 });
 
 test("full workflow: student registers, browses, orders; admin fulfils", async () => {
-  // --- student registers and signs in ---
+  // --- student registers (with email verification) and signs in ---
   const studentEmail = "2400520100101@ietlucknow.ac.in";
-  const signup = await call("POST", "/api/auth/signup", {
-    body: { name: "E2E Student", email: studentEmail, password: STUDENT_PASSWORD },
-  });
-  assert.equal(signup.status, 201);
-  assert.equal(signup.body.user.role, "student");
-
-  const login = await call("POST", "/api/auth/login", {
-    body: { email: studentEmail, password: STUDENT_PASSWORD },
-  });
-  assert.equal(login.status, 200);
-  const token = login.body.token;
+  const token = await registerStudent(
+    "E2E Student",
+    studentEmail,
+    STUDENT_PASSWORD
+  );
   assert.ok(token);
 
   // --- session restoration (the endpoint that did not exist before) ---
@@ -139,17 +166,22 @@ test("full workflow: student registers, browses, orders; admin fulfils", async (
   assert.equal(me.body.email, studentEmail);
   assert.equal(me.body.name, "E2E Student");
 
-  // --- an admin cannot be created through public signup ---
-  const escalation = await call("POST", "/api/auth/signup", {
+  // --- an admin cannot be created through verification ---
+  const escalationSend = await call("POST", "/api/auth/request-otp", {
+    body: { email: "2400520100102@ietlucknow.ac.in" },
+  });
+  assert.equal(escalationSend.status, 201);
+  const escalation = await call("POST", "/api/auth/verify-otp", {
     body: {
       name: "Escalator",
       email: "2400520100102@ietlucknow.ac.in",
       password: STUDENT_PASSWORD,
+      otp: lastCodeFor("2400520100102@ietlucknow.ac.in"),
       role: "admin",
     },
   });
   assert.equal(escalation.status, 201);
-  assert.equal(escalation.body.user.role, "student");
+  assert.equal(escalation.body.role, "student");
 
   // --- admin signs in and publishes menu items ---
   const adminLogin = await call("POST", "/api/auth/login", {
@@ -225,13 +257,7 @@ test("full workflow: student registers, browses, orders; admin fulfils", async (
 
 test("a session survives a simulated page refresh and then expires cleanly", async () => {
   const email = "2400520100103@ietlucknow.ac.in";
-  await call("POST", "/api/auth/signup", {
-    body: { name: "Refresh User", email, password: STUDENT_PASSWORD },
-  });
-  const login = await call("POST", "/api/auth/login", {
-    body: { email, password: STUDENT_PASSWORD },
-  });
-  const token = login.body.token;
+  const token = await registerStudent("Refresh User", email, STUDENT_PASSWORD);
 
   // Refresh #1 and #2: the stored token is still valid.
   for (let i = 0; i < 2; i += 1) {
@@ -269,13 +295,11 @@ test("an unknown route returns JSON 404 rather than an HTML error page", async (
 });
 test("Phase 2: full lifecycle over HTTP, driven by a real server", async () => {
   const studentEmail = "2400520100104@ietlucknow.ac.in";
-  await call("POST", "/api/auth/signup", {
-    body: { name: "Lifecycle Student", email: studentEmail, password: STUDENT_PASSWORD },
-  });
-  const login = await call("POST", "/api/auth/login", {
-    body: { email: studentEmail, password: STUDENT_PASSWORD },
-  });
-  const token = login.body.token;
+  const token = await registerStudent(
+    "Lifecycle Student",
+    studentEmail,
+    STUDENT_PASSWORD
+  );
 
   const adminLogin = await call("POST", "/api/auth/login", {
     body: { email: adminEmail, password: ADMIN_PASSWORD },
@@ -325,13 +349,11 @@ test("Phase 2: full lifecycle over HTTP, driven by a real server", async () => {
 
 test("Phase 2: student cancellation and idempotency over HTTP", async () => {
   const studentEmail = "2400520100105@ietlucknow.ac.in";
-  await call("POST", "/api/auth/signup", {
-    body: { name: "Cancel Student", email: studentEmail, password: STUDENT_PASSWORD },
-  });
-  const login = await call("POST", "/api/auth/login", {
-    body: { email: studentEmail, password: STUDENT_PASSWORD },
-  });
-  const token = login.body.token;
+  const token = await registerStudent(
+    "Cancel Student",
+    studentEmail,
+    STUDENT_PASSWORD
+  );
 
   const adminLogin = await call("POST", "/api/auth/login", {
     body: { email: adminEmail, password: ADMIN_PASSWORD },
@@ -365,14 +387,13 @@ test("Phase 2: student cancellation and idempotency over HTTP", async () => {
 
   // Another student cannot cancel it.
   const otherEmail = "2400520100106@ietlucknow.ac.in";
-  await call("POST", "/api/auth/signup", {
-    body: { name: "Other", email: otherEmail, password: STUDENT_PASSWORD },
-  });
-  const otherLogin = await call("POST", "/api/auth/login", {
-    body: { email: otherEmail, password: STUDENT_PASSWORD },
-  });
+  const otherToken = await registerStudent(
+    "Other",
+    otherEmail,
+    STUDENT_PASSWORD
+  );
   const foreign = await call("POST", `/api/orders/${orderId}/cancel`, {
-    token: otherLogin.body.token,
+    token: otherToken,
     body: {},
   });
   assert.equal(foreign.status, 403);
@@ -380,13 +401,11 @@ test("Phase 2: student cancellation and idempotency over HTTP", async () => {
 
 test("Phase 2: concurrent conflicting transitions resolve to one winner", async () => {
   const studentEmail = "2400520100107@ietlucknow.ac.in";
-  await call("POST", "/api/auth/signup", {
-    body: { name: "Race Student", email: studentEmail, password: STUDENT_PASSWORD },
-  });
-  const login = await call("POST", "/api/auth/login", {
-    body: { email: studentEmail, password: STUDENT_PASSWORD },
-  });
-  const token = login.body.token;
+  const token = await registerStudent(
+    "Race Student",
+    studentEmail,
+    STUDENT_PASSWORD
+  );
 
   const adminLogin = await call("POST", "/api/auth/login", {
     body: { email: adminEmail, password: ADMIN_PASSWORD },
