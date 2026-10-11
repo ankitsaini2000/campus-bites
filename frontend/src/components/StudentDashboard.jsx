@@ -192,6 +192,11 @@ export default function StudentDashboard({ name, onLogout }) {
   const [ratedDishes, setRatedDishes] = useState(() => new Set());
   // Receipt dialog target.
   const [receiptTarget, setReceiptTarget] = useState(null);
+  // Pre-order windows, prefetched in the background
+  // so the picker opens instantly.
+  const [slotsCache, setSlotsCache] = useState([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsLoadedAt, setSlotsLoadedAt] = useState(0);
   // Shared table order panel.
   const [groupPanelOpen, setGroupPanelOpen] = useState(false);
 
@@ -547,6 +552,40 @@ export default function StudentDashboard({ name, onLogout }) {
         setAppliedPromo(null);
         setPromoError("The promo code could not be applied and was removed");
       }
+    }
+  };
+
+  /** Fetch the bookable pre-order windows. */
+  const loadSlots = useCallback(async () => {
+    try {
+      const res = await api.get("/slots");
+      setSlotsCache(res.data || []);
+      setSlotsLoadedAt(Date.now());
+    } catch (err) {
+      setError(err.message || "Could not load the time slots");
+    }
+  }, []);
+
+  // Prefetch the windows in the background so the
+  // picker is already warm when the student clicks.
+  useEffect(() => {
+    loadSlots();
+  }, [loadSlots]);
+
+  /**
+   * Open the pre-order picker. Fresh cache shows
+   * instantly; a stale or missing cache is
+   * refetched with a visible loading state.
+   */
+  const toggleSlotPicker = () => {
+    if (showSlotPicker) {
+      setShowSlotPicker(false);
+      return;
+    }
+    setShowSlotPicker(true);
+    if (slotsCache.length === 0 || Date.now() - slotsLoadedAt > 60_000) {
+      setSlotsLoading(true);
+      loadSlots().finally(() => setSlotsLoading(false));
     }
   };
 
@@ -911,7 +950,7 @@ export default function StudentDashboard({ name, onLogout }) {
                 {!preorderSlot ? (
                   <button
                     type="button"
-                    onClick={() => setShowSlotPicker((v) => !v)}
+                    onClick={toggleSlotPicker}
                     className="flex items-center text-sm font-semibold text-brand-700 hover:text-brand-800"
                   >
                     <FaClock className="mr-1.5" />
@@ -938,6 +977,8 @@ export default function StudentDashboard({ name, onLogout }) {
                 {showSlotPicker && !preorderSlot && (
                   <div className="mt-3">
                     <SlotPicker
+                      slots={slotsCache}
+                      loading={slotsLoading}
                       selected={null}
                       onSelect={(slot) => {
                         setPreorderSlot(slot);

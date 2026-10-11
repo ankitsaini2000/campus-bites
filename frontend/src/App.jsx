@@ -43,6 +43,18 @@ export default function App() {
     };
   }, []);
 
+  // Keep the API warm: the free hosting tier spins
+  // down after ~15 idle minutes, which made the
+  // first click after a pause take 10-15s. A tiny
+  // ping every 5 minutes while a tab is open keeps
+  // the service awake.
+  useEffect(() => {
+    const t = setInterval(() => {
+      api.get("/settings").catch(() => {});
+    }, 5 * 60 * 1000);
+    return () => clearInterval(t);
+  }, []);
+
   const handleLogout = () => {
     // Best-effort server acknowledgement; the local token is what signs out.
     api.post("/auth/logout").catch(() => {});

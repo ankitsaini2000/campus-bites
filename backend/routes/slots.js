@@ -60,6 +60,19 @@ function slotDateTime(slot) {
  * created windows).
  */
 async function bootstrapSlots() {
+  // Fast path: when the latest window already covers
+  // the horizon, the upserts below are redundant —
+  // a single query says so, keeping repeat reads
+  // cheap.
+  const horizonKey = toDateKey(
+    new Date(Date.now() + (HORIZON_DAYS - 1) * 24 * 60 * 60 * 1000)
+  );
+  const latest = await TimeSlot.findOne()
+    .sort({ date: -1 })
+    .select("date")
+    .lean();
+  if (latest && latest.date >= horizonKey) return;
+
   const settings = await Settings.load();
   const today = startOfToday();
 

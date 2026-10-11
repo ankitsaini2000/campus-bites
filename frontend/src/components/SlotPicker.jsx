@@ -1,27 +1,23 @@
-import React, { useEffect, useMemo, useState } from "react";
-import api from "../api";
+import React, { useMemo, useState } from "react";
 
 /**
  * Pre-order window picker.
  *
- * Loads the bookable slots for the coming week, then
- * lets the student pick a day and a window. Only
- * windows that still have room are offered; picking
- * "Now" clears the selection and places a live order.
+ * The parent fetches the bookable windows in the
+ * background (so the picker opens instantly — the
+ * API may have been idle long enough to spin
+ * down), then the student picks a day and a
+ * window. Only windows that still have room are
+ * offered; picking "Now" clears the selection and
+ * places a live order.
  */
-export default function SlotPicker({ selected, onSelect }) {
-  const [slots, setSlots] = useState([]);
-  const [error, setError] = useState("");
+export default function SlotPicker({
+  slots = [],
+  loading,
+  selected,
+  onSelect,
+}) {
   const [day, setDay] = useState(null);
-
-  useEffect(() => {
-    api
-      .get("/slots")
-      .then((res) => setSlots(res.data || []))
-      .catch((err) =>
-        setError(err.message || "Could not load the time slots")
-      );
-  }, []);
 
   /** Slots grouped by date, oldest day first. */
   const days = useMemo(() => {
@@ -73,16 +69,17 @@ export default function SlotPicker({ selected, onSelect }) {
         ))}
       </div>
 
-      {error && (
-        <p role="alert" className="text-sm text-red-600 mb-2">
-          {error}
+      {loading && (
+        <p className="text-sm text-ink-mute mb-2">
+          Loading pickup windows…
         </p>
       )}
 
       <div className="flex flex-wrap gap-2">
         {daySlots.map((s) => {
           const full = s.available <= 0;
-          const isSelected = selected && String(selected._id) === String(s._id);
+          const isSelected =
+            selected && String(selected._id) === String(s._id);
           return (
             <button
               key={s._id}
