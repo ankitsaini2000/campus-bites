@@ -170,7 +170,9 @@ export default function Login({ setUserRole, setUserName, switchPage }) {
 
           <p className="mt-4 flex items-start gap-2 text-xs text-ink-mute">
             <FaInfoCircle className="mt-0.5 shrink-0 text-brand-400" />
-            Staff accounts are provisioned by canteen administrators.
+            For students of the Institute of Engineering and Technology
+            (IET), Lucknow. Staff accounts are provisioned by canteen
+            administrators.
           </p>
         </div>
       </div>

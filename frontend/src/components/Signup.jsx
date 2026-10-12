@@ -151,8 +151,9 @@ export default function Signup({ switchPage, setUserRole, setUserName }) {
 
         <p className="mt-4 flex items-start justify-center gap-2 text-xs text-ink-mute text-center">
           <FaInfoCircle className="mt-0.5 shrink-0 text-brand-400" />
-          IET Lucknow student accounts only — staff and admin accounts are
-          created by canteen administrators.
+          For students of the Institute of Engineering and Technology
+          (IET), Lucknow — staff and admin accounts are created by
+          canteen administrators.
         </p>
       </div>
     </div>
