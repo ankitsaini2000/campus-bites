@@ -186,6 +186,26 @@ test("GET /api/auth/me returns the current user", async () => {
   assert.equal(res.body.email, "mia@college.edu");
   assert.equal(res.body.role, "admin");
   assert.ok(res.body.id);
+  assert.ok(res.body.notificationPrefs);
+  assert.equal(res.body.notificationPrefs.sound, true);
+});
+
+test("PUT /api/auth/me toggles the pickup bell preference", async () => {
+  await makeUser({ name: "Bell", email: "bell@college.edu", password: "password123", role: "student" });
+  const login = await api()
+    .post("/api/auth/login")
+    .send({ email: "bell@college.edu", password: "password123" });
+  const auth = { Authorization: `Bearer ${login.body.token}` };
+
+  const updated = await api()
+    .put("/api/auth/me")
+    .set(auth)
+    .send({ notificationPrefs: { sound: false } });
+  assert.equal(updated.status, 200);
+  assert.equal(updated.body.notificationPrefs.sound, false);
+
+  const me = await api().get("/api/auth/me").set(auth);
+  assert.equal(me.body.notificationPrefs.sound, false);
 });
 
 test("GET /api/auth/me accepts a bare token for backward compatibility", async () => {

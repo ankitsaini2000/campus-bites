@@ -60,6 +60,7 @@ UserSchema.methods.toPublicJSON = function () {
     name: this.name,
     email: this.email,
     role: this.role,
+    notificationPrefs: this.notificationPrefs,
   };
 };
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   FaShoppingCart,
@@ -13,8 +13,11 @@ import {
   FaClock,
   FaStar,
   FaCheck,
+  FaBell,
+  FaBellSlash,
 } from "react-icons/fa";
 import api from "../api";
+import { playBell } from "../bell";
 import { statusTone, isActive } from "../orderStatus";
 import OrderTimeline from "./OrderTimeline";
 import SeatsCard from "./SeatsCard";
@@ -172,6 +175,11 @@ export default function StudentDashboard({ name, onLogout }) {
   const [liveStatus, setLiveStatus] = useState("connecting");
   // Orders that just became Ready, surfaced as a pickup notification.
   const [readyAlerts, setReadyAlerts] = useState([]);
+  // Pickup bell: a chime when an order becomes Ready. The ref
+  // keeps the realtime handler (mounted once) in sync with
+  // the latest toggle, since the effect closure is static.
+  const [bellOn, setBellOn] = useState(true);
+  const bellOnRef = useRef(true);
   // Promo code applied to the current tray.
   const [promoCode, setPromoCode] = useState("");
   const [appliedPromo, setAppliedPromo] = useState(null);
@@ -342,6 +350,8 @@ export default function StudentDashboard({ name, onLogout }) {
               ? prev
               : [...prev, { orderId: event.orderId, at: event.at }]
           );
+          // The call-out bell, when the student has it on.
+          if (bellOnRef.current) playBell();
         }
         refreshOrder(event.orderId);
       },
@@ -349,6 +359,40 @@ export default function StudentDashboard({ name, onLogout }) {
 
     return () => client.close();
   }, [refreshOrder, refreshOrders, refreshFoods, refreshSeats]);
+
+  // Read the stored bell preference so the chime follows the
+  // account, not just this tab. Defaults to on (matching the
+  // server default) until the profile says otherwise.
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get("/auth/me")
+      .then((res) => {
+        if (cancelled) return;
+        const on = res.data?.notificationPrefs?.sound !== false;
+        bellOnRef.current = on;
+        setBellOn(on);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Flip the pickup bell and persist it. Optimistic: the
+  // setting applies instantly, and rolls back if the save fails.
+  const toggleBell = useCallback(async () => {
+    const next = !bellOnRef.current;
+    bellOnRef.current = next;
+    setBellOn(next);
+    try {
+      await api.put("/auth/me", { notificationPrefs: { sound: next } });
+    } catch (err) {
+      bellOnRef.current = !next;
+      setBellOn(!next);
+      setError(err.message || "Could not save the bell setting");
+    }
+  }, []);
 
   const takeSeat = useCallback(async () => {
     setSeatsBusy(true);
@@ -657,6 +701,21 @@ export default function StudentDashboard({ name, onLogout }) {
               />
               {liveStatus === "connected" ? "Live" : "Offline"}
             </span>
+
+            <button
+              type="button"
+              data-testid="bell-toggle"
+              aria-label={bellOn ? "Mute pickup bell" : "Unmute pickup bell"}
+              title={bellOn ? "Pickup bell is on" : "Pickup bell is muted"}
+              onClick={toggleBell}
+              className={`inline-flex items-center px-3 py-1.5 rounded-full shadow-sm ${
+                bellOn
+                  ? "bg-brand-50 text-brand-700 border border-brand-100"
+                  : "bg-stone-100 text-stone-500 border border-stone-200"
+              }`}
+            >
+              {bellOn ? <FaBell /> : <FaBellSlash />}
+            </button>
 
             <span className="hidden sm:inline-flex items-center gap-2 text-sm font-semibold text-ink bg-brand-50 border border-brand-100 px-3 py-1.5 rounded-full">
               {name}
