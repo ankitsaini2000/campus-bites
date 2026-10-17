@@ -66,9 +66,9 @@ export default function Signup({ switchPage, setUserRole, setUserName }) {
         </div>
 
         <div className="bg-white rounded-2xl shadow-lift p-8">
-          <h2 className="text-2xl font-extrabold text-ink text-center">
+          <h1 className="text-2xl font-extrabold text-ink text-center">
             Create your student account
-          </h2>
+          </h1>
           <p className="text-sm text-ink-mute text-center mt-1 mb-6">
             Join the canteen — order ahead, skip the rush.
           </p>

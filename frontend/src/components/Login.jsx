@@ -54,9 +54,9 @@ export default function Login({ setUserRole, setUserName, switchPage }) {
           <p className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold">
             <FaBolt className="text-amber-200" /> Skip the line — order ahead
           </p>
-          <h1 className="mt-5 text-5xl font-extrabold leading-tight">
+          <p className="mt-5 text-5xl font-extrabold leading-tight">
             Hungry? We have got you covered.
-          </h1>
+          </p>
           <p className="mt-4 text-lg text-white/85">
             Order from your campus canteen in seconds. Live kitchen tracking,
             rush-hour wait times, and counter pickup.
@@ -96,9 +96,12 @@ export default function Login({ setUserRole, setUserName, switchPage }) {
           </div>
 
           <div className="bg-white rounded-2xl shadow-lift p-8">
-            <h2 className="text-2xl font-extrabold text-ink">Welcome back</h2>
+            <h1 className="text-2xl font-extrabold text-ink">
+              Online canteen ordering for IET Lucknow
+            </h1>
             <p className="text-sm text-ink-mute mt-1 mb-6">
-              Sign in to check today&apos;s menu, your tray, and live order status.
+              Welcome back — sign in to check today&apos;s canteen menu, your
+              tray, and live order status.
             </p>
 
             <form onSubmit={handleLogin} className="space-y-4">
@@ -174,6 +177,20 @@ export default function Login({ setUserRole, setUserName, switchPage }) {
             (IET), Lucknow. Staff accounts are provisioned by canteen
             administrators.
           </p>
+
+          <section className="mt-6" aria-label="What you can do on Campus Bites">
+            <h2 className="text-xs font-bold uppercase tracking-wide text-ink-mute">
+              What you can do on Campus Bites
+            </h2>
+            <ul className="mt-3 grid gap-2 text-sm text-ink-soft sm:grid-cols-2">
+              <li>Browse today&apos;s canteen menu with prices and prep times</li>
+              <li>Pre-order a pickup slot and skip the lunch-rush queue</li>
+              <li>Track your order live, from the kitchen to the counter</li>
+              <li>Reserve a canteen seat before you arrive</li>
+              <li>Rate dishes and see what&apos;s trending on campus</li>
+              <li>Split a table bill with friends on a shared order</li>
+            </ul>
+          </section>
         </div>
       </div>
     </div>
