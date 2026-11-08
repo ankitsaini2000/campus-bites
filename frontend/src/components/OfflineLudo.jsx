@@ -70,6 +70,8 @@ const LUDO_STYLES = `
 .cbLudo .tk3{background:radial-gradient(circle at 32% 28%,#93C5FD,#3B82F6 55%,#1D4ED8);}
 .cbLudo .token.finished{opacity:.92;}
 .cbLudo .token.movable{cursor:pointer;animation:ludoPulse .9s ease-in-out infinite;z-index:9;}
+/* The one intentionally global rule: @keyframes cannot be scoped, and this
+   name is unique, so there is no collision risk. */
 @keyframes ludoPulse{
   0%,100%{box-shadow:0 3px 6px rgba(28,25,23,.35),0 0 0 0 rgba(249,115,22,.75);}
   50%{box-shadow:0 3px 6px rgba(28,25,23,.35),0 0 0 7px rgba(249,115,22,.18);}
@@ -595,6 +597,7 @@ export default function OfflineLudo() {
       disposed = true;
       document.removeEventListener("keydown", onKey);
       styleEl.remove();
+      if (AC) AC.close().catch(() => {});
       root.innerHTML = "";
     };
   }, []);
