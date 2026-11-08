@@ -76,6 +76,15 @@ export default function App() {
     setScreen("dashboard");
   };
 
+  // While offline the whole app (login, student or staff dashboard) yields to
+  // the Ludo overlay. This takes precedence over the session check/retry
+  // screen: if the browser has no network, checking a session cannot work and
+  // the user should get the offline game instead. When the network returns,
+  // the normal flow resumes.
+  if (isOffline) {
+    return <OfflineLudo />;
+  }
+
   // Avoid flashing the login form while validating a stored token.
   if (checkingSession) {
     return (
@@ -115,14 +124,6 @@ export default function App() {
         </div>
       </div>
     );
-  }
-
-  // While offline the whole app (login, student or staff dashboard) yields to
-  // the Ludo overlay; the network returning puts the previous view back. The
-  // splash above keeps its place: only once the session check has settled can
-  // the overlay take over, per the approved design.
-  if (isOffline && !checkingSession) {
-    return <OfflineLudo />;
   }
 
   if (!userRole) {
