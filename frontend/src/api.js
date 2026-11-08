@@ -20,6 +20,9 @@ export const TOKEN_KEY = "token";
 const api = axios.create({
   baseURL: `${API_URL}/api`,
   headers: { "Content-Type": "application/json" },
+  // A down/back-end-in-freezing host must never leave a request hanging:
+  // 20s is longer than any healthy response, short enough to keep UX moving.
+  timeout: 20_000,
 });
 
 /** Read the stored JWT, or null when signed out. */
