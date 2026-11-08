@@ -2,15 +2,19 @@ import React, { useState, useEffect } from "react";
 import api, { getToken, clearToken } from "./api";
 import Login from "./components/Login";
 import Signup from "./components/Signup";
+import OfflineLudo from "./components/OfflineLudo";
 import StudentDashboard from "./components/StudentDashboard";
 import AdminDashboard from "./components/AdminDashboard";
 import KitchenDisplay from "./components/KitchenDisplay";
+import useOffline from "./hooks/useOffline";
 
 export default function App() {
   const [userRole, setUserRole] = useState(null);
   const [userName, setUserName] = useState("");
   const [showLogin, setShowLogin] = useState(true);
   const [checkingSession, setCheckingSession] = useState(true);
+  // True when the browser reports no network.
+  const isOffline = useOffline();
   // Set when /auth/me failed for a non-auth reason (network, timeout, 5xx):
   // the stored token is kept and the user is offered a retry instead of
   // silently landing on the login screen as if they had signed out.
@@ -111,6 +115,14 @@ export default function App() {
         </div>
       </div>
     );
+  }
+
+  // While offline the whole app (login, student or staff dashboard) yields to
+  // the Ludo overlay; the network returning puts the previous view back. The
+  // splash above keeps its place: only once the session check has settled can
+  // the overlay take over, per the approved design.
+  if (isOffline && !checkingSession) {
+    return <OfflineLudo />;
   }
 
   if (!userRole) {
