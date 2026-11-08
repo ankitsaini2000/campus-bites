@@ -54,6 +54,17 @@ export default function App() {
     checkSession();
   }, []);
 
+  // If the page was loaded offline (session check failed) and the network
+  // comes back, re-check automatically so the dashboard returns without the
+  // user having to press Retry.
+  useEffect(() => {
+    if (!isOffline && sessionFailed) {
+      setSessionFailed(false);
+      setCheckingSession(true);
+      checkSession();
+    }
+  }, [isOffline]);
+
   // Keep the API warm: the free hosting tier spins
   // down after ~15 idle minutes, which made the
   // first click after a pause take 10-15s. A tiny

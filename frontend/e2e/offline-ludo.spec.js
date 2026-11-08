@@ -60,3 +60,29 @@ test("no Ludo overlay while online", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1 })).toContainText(student.name);
   await expect(page.getByTestId("offline-ludo")).toHaveCount(0);
 });
+
+test("after the app is cached, an offline reload shows the Ludo game", async ({ page }) => {
+  const student = await createStudent();
+  await page.addInitScript((token) => localStorage.setItem("token", token), student.token);
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(student.name);
+
+  // Wait for the service worker to take control, then reload once online so
+  // the app shell is served and cached under the worker. After that, an
+  // offline reload boots from cache.
+  await page.waitForFunction(() => !!navigator.serviceWorker?.controller, null, { timeout: 15_000 });
+  await page.reload();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(student.name);
+  await page.waitForFunction(() => !!navigator.serviceWorker?.controller, null, { timeout: 15_000 });
+
+  await page.context().setOffline(true);
+  await page.reload();
+  await expect(page.getByTestId("offline-ludo")).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId("offline-ludo").getByRole("button", { name: "Start game" }).click();
+  await page.getByTestId("ludo-roll").click();
+  await expect(page.getByTestId("ludo-msg")).toContainText(/rolled/i, { timeout: 10_000 });
+
+  await page.context().setOffline(false);
+  await expect(page.getByTestId("offline-ludo")).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(student.name);
+});
